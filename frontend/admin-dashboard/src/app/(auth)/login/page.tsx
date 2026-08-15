@@ -31,12 +31,21 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-primary flex flex-col items-center justify-center px-6">
-      <div className="flex flex-col items-center mb-10">
-        <div className="relative h-28 w-28 mb-4">
-          <Image src="/logo.png" alt="MaidKaro" fill className="object-contain" priority />
+    <div className="min-h-screen bg-primary flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Ambient background glow for seamless visual blending */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="flex flex-col items-center mb-8 relative z-10">
+        <div className="relative h-28 w-40 mb-1">
+          <Image
+            src="/logo-transparent.png"
+            alt="MaidKaro"
+            fill
+            className="object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.25)]"
+            priority
+          />
         </div>
-        <p className="text-white/60 text-sm tracking-wide">Operations &amp; Trust Console</p>
+        <p className="text-white/70 text-xs tracking-widest uppercase font-semibold">Operations &amp; Trust Console</p>
       </div>
 
       <Card className="w-full max-w-sm">
