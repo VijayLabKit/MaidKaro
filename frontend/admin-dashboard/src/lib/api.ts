@@ -71,6 +71,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return transformKeys(raw, toCamel) as T;
 }
 
+export const fetcher = <T>(url: string): Promise<T> => apiFetch<T>(url);
+
 export const api = {
   get: <T>(path: string) => apiFetch<T>(path),
   post: <T>(path: string, body?: unknown) =>
