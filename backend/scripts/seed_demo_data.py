@@ -26,7 +26,7 @@ from app.database.models import (
     Booking, BookingType, BookingStatus, BookingStatusEvent,
     Payment, PaymentStatus, Review, PayoutLedgerEntry, Payout, PayoutStatus,
     Complaint, ComplaintStatus, ComplaintRaisedBy,
-    Notification, NotificationChannel, PlatformSetting, OtpCode,
+    Notification, NotificationChannel, PlatformSetting, OtpCode, AuditLog,
 )
 from app.security.security import hash_password
 from scripts.seed import seed as seed_base
@@ -558,18 +558,76 @@ def create_notifications(db, customers, workers, bookings):
     print(f"Created {count} demo notifications.")
 
 
-def create_second_admin(db):
-    email = "ops.admin@maidkaro.com"
-    if db.query(AdminProfile).filter(AdminProfile.email == email).first():
-        return
-    user = User(phone="+919900000001", role=Role.ADMIN)
-    db.add(user)
+def create_staff_accounts(db):
+    staff_data = [
+        ("Ishan Chowdhury", "admin@maidkaro.com", "+910000000000", Role.SUPER_ADMIN, "ChangeMe123!"),
+        ("Priyanka Sen (Ops Lead)", "ops.admin@maidkaro.com", "+919900000001", Role.ADMIN, "ChangeMe123!"),
+        ("Rahul Banerjee (Trust & Safety)", "safety.desk@maidkaro.com", "+919900000002", Role.ADMIN, "ChangeMe123!"),
+        ("Ankita Roy (City Coordinator)", "siliguri.ops@maidkaro.com", "+919900000003", Role.ADMIN, "ChangeMe123!"),
+    ]
+
+    for full_name, email, ph, role, pwd in staff_data:
+        existing = db.query(AdminProfile).filter(AdminProfile.email == email).first()
+        if existing:
+            existing.full_name = full_name
+            db.commit()
+            continue
+        user = db.query(User).filter(User.phone == ph).first()
+        if not user:
+            user = User(phone=ph, role=role, is_active=True)
+            db.add(user)
+            db.flush()
+        db.add(AdminProfile(
+            user_id=user.id, full_name=full_name, email=email,
+            password_hash=hash_password(pwd),
+        ))
     db.flush()
-    db.add(AdminProfile(
-        user_id=user.id, full_name="Priyanka Ops Admin", email=email,
-        password_hash=hash_password("ChangeMe123!"),
-    ))
-    print(f"Created ops admin: {email} / ChangeMe123!")
+    print("Created 4 demo administrative and ops staff accounts.")
+
+
+def create_audit_logs(db, admin_user_id, workers, categories, complaints):
+    actions = [
+        ("WORKER_APPROVED", "WorkerProfile", random.choice(workers).id if workers else "w1", {"note": "Aadhaar and police verification cleared."}),
+        ("WORKER_REQUEST_RESUBMISSION", "WorkerProfile", random.choice(workers).id if workers else "w2", {"note": "Address proof blurred."}),
+        ("CATEGORY_COMMISSION_UPDATED", "ServiceCategory", random.choice(categories).id if categories else "c1", {"commission_pct": 15.0}),
+        ("REFUND_ISSUED", "Complaint", random.choice(complaints).id if complaints else "cp1", {"refund_amount": 450.0, "reason": "Late arrival compensation"}),
+        ("CITY_LAUNCHED", "City", "siliguri-1", {"name": "Siliguri", "state": "West Bengal"}),
+        ("PAYOUT_BATCH_PROCESSED", "Payout", "payout-batch-101", {"total_amount": 24500.0, "workers_count": 12}),
+        ("SAFETY_INCIDENT_ACKNOWLEDGED", "SafetyIncident", "inc-99", {"notes": "Rapid response team contacted worker"}),
+        ("STAFF_LOGIN_SUCCESS", "AdminProfile", "admin-1", {"ip": "103.212.44.18"}),
+        ("PLATFORM_SETTINGS_UPDATED", "PlatformSetting", "global", {"surge_multiplier": 1.2}),
+    ]
+
+    now = datetime.utcnow()
+    for i, (action, entity_type, entity_id, meta) in enumerate(actions * 3):
+        created_at = now - timedelta(days=random.randint(0, 25), hours=random.randint(1, 23))
+        db.add(AuditLog(
+            actor_user_id=admin_user_id,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            metadata_json=meta,
+            ip_address=f"103.212.{random.randint(10, 99)}.{random.randint(1, 254)}",
+            created_at=created_at,
+        ))
+    db.flush()
+    print("Created 27 demo security and compliance audit logs.")
+
+
+def seed_platform_settings(db):
+    settings_data = [
+        ("default_commission_pct", "15.0"),
+        ("surge_multiplier", "1.0"),
+        ("sos_emergency_phone", "+911800123456"),
+    ]
+    for key, val in settings_data:
+        row = db.query(PlatformSetting).filter(PlatformSetting.key == key).first()
+        if not row:
+            db.add(PlatformSetting(key=key, value=val))
+        else:
+            row.value = val
+    db.flush()
+    print("Seeded global platform settings.")
 
 
 def seed_demo(force: bool = False):
@@ -589,7 +647,7 @@ def seed_demo(force: bool = False):
         pincodes = db.query(Pincode).filter(Pincode.service_zone_id == zone.id).all()
         categories = db.query(ServiceCategory).all()
 
-        create_second_admin(db)
+        create_staff_accounts(db)
         customers = create_customers(db, city, pincodes)
         workers = create_workers(db, city, zone, categories)
         db.commit()
@@ -601,6 +659,8 @@ def seed_demo(force: bool = False):
         create_payouts(db, workers)
         create_complaints(db, bookings)
         create_notifications(db, customers, workers, bookings)
+        create_audit_logs(db, admin.user_id if admin else None, workers, categories, db.query(Complaint).all())
+        seed_platform_settings(db)
 
         db.add(PlatformSetting(key=DEMO_SEED_MARKER_KEY, value=datetime.utcnow().isoformat()))
         db.commit()
@@ -611,8 +671,10 @@ def seed_demo(force: bool = False):
         print(f"  * {len(bookings)} Bookings (Completed, In-Progress, Confirmed, Pending, Cancelled)")
         print(f"  * {len(bookings)} Payment & Ledger records in INR")
         print("  * Demo admin logins:")
-        print("    admin@maidkaro.com / ChangeMe123!  (super admin)")
-        print("    ops.admin@maidkaro.com / ChangeMe123!  (admin)")
+        print("    admin@maidkaro.com / ChangeMe123!  (Super Admin: Ishan Chowdhury)")
+        print("    ops.admin@maidkaro.com / ChangeMe123!  (Ops Lead: Priyanka Sen)")
+        print("    safety.desk@maidkaro.com / ChangeMe123!  (Trust & Safety)")
+        print("    siliguri.ops@maidkaro.com / ChangeMe123!  (City Coordinator)")
     finally:
         db.close()
 

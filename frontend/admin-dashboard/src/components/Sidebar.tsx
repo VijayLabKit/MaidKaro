@@ -18,24 +18,25 @@ import {
   Settings,
   LogOut,
   Crown,
+  Lock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const OPERATIONS_NAV = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/workers', label: 'Worker verification', icon: UserCheck },
-  { href: '/bookings', label: 'Bookings & logistics', icon: CalendarClock },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/complaints', label: 'Complaints & disputes', icon: MessageSquareWarning },
-  { href: '/categories', label: 'Service categories', icon: Tags },
-  { href: '/cities', label: 'Cities & zones', icon: MapPin },
+  { href: '/workers', label: 'Worker Verification', icon: UserCheck },
+  { href: '/bookings', label: 'Bookings & Dispatch', icon: CalendarClock },
+  { href: '/customers', label: 'Customer Directory', icon: Users },
+  { href: '/complaints', label: 'Complaints & Disputes', icon: MessageSquareWarning },
+  { href: '/categories', label: 'Service Categories', icon: Tags },
+  { href: '/cities', label: 'Cities & Zones', icon: MapPin },
 ];
 
 const GOVERNANCE_NAV = [
   { href: '/payouts', label: 'Worker Payouts', icon: CreditCard },
   { href: '/admins', label: 'Staff Management', icon: ShieldCheck, superOnly: true },
-  { href: '/audit-logs', label: 'Security & Audit', icon: FileSpreadsheet, superOnly: true },
+  { href: '/audit-logs', label: 'Security & Audit Logs', icon: FileSpreadsheet, superOnly: true },
   { href: '/settings', label: 'Platform Settings', icon: Settings, superOnly: true },
 ];
 
@@ -45,24 +46,26 @@ export function Sidebar() {
   const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
 
   return (
-    <aside className="w-64 shrink-0 bg-primary min-h-screen flex flex-col">
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-white/10">
+    <aside className="w-64 shrink-0 bg-primary min-h-screen flex flex-col border-r border-white/5 select-none">
+      {/* Brand Header */}
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
         <div className="relative h-9 w-9 shrink-0">
           <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill sizes="36px" className="object-contain" />
         </div>
-        <div>
-          <p className="text-white font-semibold text-sm tracking-wide">MAIDKARO</p>
-          <p className="text-white/40 text-[11px]">Operations & Governance</p>
+        <div className="min-w-0">
+          <p className="text-white font-bold text-sm tracking-wider leading-none">MAIDKARO</p>
+          <p className="text-white/45 text-[11px] font-medium tracking-tight mt-1 truncate">Admin &amp; Ops Control</p>
         </div>
       </div>
 
-      <nav className="flex-1 px-3 py-4 flex flex-col gap-5 overflow-y-auto">
+      {/* Main Navigation */}
+      <nav className="flex-1 px-3 py-4 flex flex-col gap-6 overflow-y-auto">
         {/* Operations Section */}
         <div>
-          <p className="px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1.5">
+          <p className="px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
             Field Operations
           </p>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             {OPERATIONS_NAV.map(({ href, label, icon: Icon }) => {
               const isActive = pathname === href || pathname?.startsWith(`${href}/`);
               return (
@@ -70,14 +73,14 @@ export function Sidebar() {
                   key={href}
                   href={href}
                   className={clsx(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                     isActive
-                      ? 'bg-secondary text-secondary-foreground font-medium shadow-sm'
+                      ? 'bg-secondary text-secondary-foreground font-semibold shadow-sm'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                   )}
                 >
-                  <Icon size={17} strokeWidth={2} />
-                  <span>{label}</span>
+                  <Icon size={17} strokeWidth={2} className="shrink-0" />
+                  <span className="truncate">{label}</span>
                 </Link>
               );
             })}
@@ -86,17 +89,17 @@ export function Sidebar() {
 
         {/* Governance & Platform Section */}
         <div>
-          <div className="flex items-center justify-between px-3 mb-1.5">
+          <div className="flex items-center justify-between px-3 mb-2">
             <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
               Governance &amp; Finance
             </p>
             {isSuperAdmin && (
-              <span className="text-[9px] bg-amber-500/20 text-amber-300 font-semibold px-1.5 py-0.2 rounded border border-amber-500/30">
-                Super Admin
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/25">
+                <Crown size={10} /> Super
               </span>
             )}
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             {GOVERNANCE_NAV.map(({ href, label, icon: Icon, superOnly }) => {
               const isActive = pathname === href || pathname?.startsWith(`${href}/`);
               return (
@@ -104,18 +107,20 @@ export function Sidebar() {
                   key={href}
                   href={href}
                   className={clsx(
-                    'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-colors',
+                    'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all',
                     isActive
-                      ? 'bg-secondary text-secondary-foreground font-medium shadow-sm'
+                      ? 'bg-secondary text-secondary-foreground font-semibold shadow-sm'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <Icon size={17} strokeWidth={2} />
-                    <span>{label}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Icon size={17} strokeWidth={2} className="shrink-0" />
+                    <span className="truncate">{label}</span>
                   </div>
                   {superOnly && !isSuperAdmin && (
-                    <span className="text-[10px] bg-white/10 text-white/50 px-1.5 py-0.5 rounded">Lock</span>
+                    <span className="text-[10px] bg-white/10 text-white/40 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                      <Lock size={10} />
+                    </span>
                   )}
                 </Link>
               );
@@ -125,8 +130,8 @@ export function Sidebar() {
       </nav>
 
       {/* User profile & Sign out */}
-      <div className="px-3 py-4 border-t border-white/10 bg-black/10">
-        <div className="flex items-center gap-3 px-2 py-2 mb-2">
+      <div className="px-3 py-4 border-t border-white/10 bg-black/15">
+        <div className="flex items-center gap-3 px-2 py-1.5 mb-2">
           <Avatar className="h-9 w-9 bg-white/10 text-white border border-white/20 shrink-0">
             <AvatarFallback className="bg-white/10 text-white text-xs font-bold">
               {admin?.fullName?.charAt(0) ?? 'A'}
@@ -134,14 +139,14 @@ export function Sidebar() {
           </Avatar>
           <div className="min-w-0 flex-1">
             <p className="text-white text-sm font-semibold truncate leading-tight">{admin?.fullName}</p>
-            <div className="flex items-center gap-1.5 mt-1">
+            <div className="mt-1">
               {isSuperAdmin ? (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/30">
                   <Crown size={10} /> Super Admin
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30">
-                  <ShieldCheck size={10} /> Ops Admin
+                  <ShieldCheck size={10} /> Operations Admin
                 </span>
               )}
             </div>
