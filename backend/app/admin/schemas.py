@@ -187,3 +187,65 @@ class AdminCategoryOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class StaffMemberOut(BaseModel):
+    id: str
+    user_id: str
+    full_name: str
+    email: str
+    phone: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class CreateStaffIn(BaseModel):
+    full_name: str
+    email: str
+    phone: str
+    password: str
+    role: str = Field("ADMIN", pattern="^(ADMIN|SUPER_ADMIN)$")
+
+
+class ToggleStaffStatusIn(BaseModel):
+    is_active: bool
+
+
+class AdminPayoutOut(BaseModel):
+    id: str
+    worker_id: str
+    worker_name: str
+    worker_phone: str
+    amount: float
+    status: str
+    requested_at: datetime
+    processed_at: Optional[datetime] = None
+    razorpay_payout_id: Optional[str] = None
+
+
+class AdminAuditLogOut(BaseModel):
+    id: str
+    actor_user_id: Optional[str] = None
+    actor_name: str = "System"
+    action: str
+    entity_type: str
+    entity_id: str
+    metadata_json: Optional[dict] = None
+    ip_address: Optional[str] = None
+    created_at: datetime
+
+
+class PlatformSettingsOut(BaseModel):
+    default_commission_pct: float
+    surge_multiplier: float
+    otp_expiry_seconds: int
+    sos_emergency_phone: str
+    sms_provider: str
+    environment: str
+
+
+class UpdatePlatformSettingsIn(BaseModel):
+    default_commission_pct: Optional[float] = Field(None, ge=0, le=50)
+    surge_multiplier: Optional[float] = Field(None, ge=1.0, le=5.0)
+    sos_emergency_phone: Optional[str] = None

@@ -61,4 +61,6 @@ def admin_login(payload: AdminLoginIn, db: Session = Depends(get_db)):
         subject=user.id, role=user.role.value,
         secret=settings.ADMIN_JWT_SECRET_KEY,
     )
-    return AdminTokenOut(access_token=token, full_name=admin.full_name, email=admin.email)
+    return AdminTokenOut(
+        access_token=token, full_name=admin.full_name, email=admin.email, role=user.role.value
+    )

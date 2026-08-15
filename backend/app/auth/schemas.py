@@ -56,3 +56,4 @@ class AdminTokenOut(BaseModel):
     token_type: str = "bearer"
     full_name: str
     email: str
+    role: str

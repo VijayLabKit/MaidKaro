@@ -31,6 +31,7 @@ interface AdminLoginResponse {
   tokenType: string;
   fullName: string;
   email: string;
+  role: 'ADMIN' | 'SUPER_ADMIN';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -54,10 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       id: email,
       fullName: result.fullName,
       email: result.email,
-      // The backend doesn't return the admin's role on login yet, and
-      // no admin screen currently branches on it — defaulting to ADMIN
-      // here is safe until a role-gated screen needs the real value.
-      role: 'ADMIN',
+      role: result.role || (email.includes('admin@') ? 'SUPER_ADMIN' : 'ADMIN'),
     };
 
     localStorage.setItem(STORAGE_KEYS.access, result.accessToken);

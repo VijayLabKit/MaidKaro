@@ -10,8 +10,11 @@ from app.database.models import (
     User, Role, CustomerProfile, WorkerProfile, VerificationStatus, Booking,
     BookingStatus, Payment, PaymentStatus, Complaint, ComplaintStatus,
     SafetyIncident, SafetyIncidentStatus, ServiceCategory, City, AuditLog,
+    Payout, PayoutStatus, AdminProfile, PlatformSetting,
 )
 from app.security.deps import get_current_admin
+from app.security.security import hash_password
+from app.config import settings
 from app.admin.schemas import (
     DashboardStatsOut, WorkerVerificationActionIn, AdminWorkerOut,
     AdminComplaintActionIn, CreateCategoryIn, CreateCityIn,
@@ -20,6 +23,8 @@ from app.admin.schemas import (
     AdminWorkerDetailOut, AdminKycDocumentOut, AdminSkillRef, WorkerReviewActionIn,
     ComplaintResolveIn, AdminComplaintOut, AdminComplaintBookingRef,
     UpdateCommissionIn, AdminCategoryOut,
+    StaffMemberOut, CreateStaffIn, ToggleStaffStatusIn,
+    AdminPayoutOut, AdminAuditLogOut, PlatformSettingsOut, UpdatePlatformSettingsIn,
 )
 from app.notifications.service import send_push
 from app.support.service import acknowledge_incident
@@ -319,3 +324,197 @@ def update_category_commission(category_id: str, payload: UpdateCommissionIn, ad
     db.commit()
     _audit(db, admin, "CATEGORY_COMMISSION_UPDATED", "ServiceCategory", category.id, {"commission_pct": payload.commission_pct})
     return {"id": category.id, "commission_pct": float(category.commission_pct)}
+
+
+# ── Super Admin: Staff Management ──────────────────────────────
+@router.get("/staff", response_model=List[StaffMemberOut])
+def list_staff(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    profiles = db.query(AdminProfile).all()
+    results = []
+    for p in profiles:
+        u = p.user
+        results.append(StaffMemberOut(
+            id=p.id,
+            user_id=u.id,
+            full_name=p.full_name,
+            email=p.email,
+            phone=u.phone,
+            role=u.role.value,
+            is_active=u.is_active,
+            created_at=p.created_at,
+        ))
+    return results
+
+
+@router.post("/staff", response_model=StaffMemberOut, status_code=status.HTTP_201_CREATED)
+def create_staff_member(payload: CreateStaffIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    if admin.role != Role.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Super Admins can create and invite staff accounts.")
+
+    existing_email = db.query(AdminProfile).filter(AdminProfile.email == payload.email).first()
+    if existing_email:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "An admin with this email already exists.")
+
+    existing_user = db.query(User).filter(User.phone == payload.phone).first()
+    if existing_user:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "An account with this phone number already exists.")
+
+    new_user = User(phone=payload.phone, role=Role(payload.role), is_active=True)
+    db.add(new_user)
+    db.flush()
+
+    new_profile = AdminProfile(
+        user_id=new_user.id,
+        full_name=payload.full_name,
+        email=payload.email,
+        password_hash=hash_password(payload.password),
+    )
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_profile)
+
+    _audit(db, admin, f"STAFF_CREATED_{payload.role}", "AdminProfile", new_profile.id, {"email": payload.email})
+
+    return StaffMemberOut(
+        id=new_profile.id,
+        user_id=new_user.id,
+        full_name=new_profile.full_name,
+        email=new_profile.email,
+        phone=new_user.phone,
+        role=new_user.role.value,
+        is_active=new_user.is_active,
+        created_at=new_profile.created_at,
+    )
+
+
+@router.patch("/staff/{staff_id}/status")
+def toggle_staff_status(staff_id: str, payload: ToggleStaffStatusIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    if admin.role != Role.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Super Admins can alter staff account status.")
+
+    profile = db.query(AdminProfile).filter(AdminProfile.id == staff_id).first()
+    if not profile:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff member not found.")
+
+    if profile.user_id == admin.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "You cannot deactivate your own account.")
+
+    profile.user.is_active = payload.is_active
+    db.commit()
+    _audit(db, admin, "STAFF_STATUS_UPDATED", "AdminProfile", profile.id, {"is_active": payload.is_active})
+    return {"id": profile.id, "is_active": profile.user.is_active}
+
+
+# ── Financials: Worker Payouts & Settlement ──────────────────
+@router.get("/payouts", response_model=List[AdminPayoutOut])
+def list_payouts(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    payouts = db.query(Payout).order_by(Payout.requested_at.desc()).limit(200).all()
+    results = []
+    for p in payouts:
+        w = p.worker
+        results.append(AdminPayoutOut(
+            id=p.id,
+            worker_id=w.id if w else "—",
+            worker_name=w.full_name if w else "Unknown",
+            worker_phone=w.user.phone if w and w.user else "—",
+            amount=float(p.amount),
+            status=p.status.value,
+            requested_at=p.requested_at,
+            processed_at=p.processed_at,
+            razorpay_payout_id=p.razorpay_payout_id,
+        ))
+    return results
+
+
+@router.post("/payouts/{payout_id}/process")
+def process_payout(payout_id: str, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    payout = db.query(Payout).filter(Payout.id == payout_id).first()
+    if not payout:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payout record not found.")
+
+    if payout.status == PayoutStatus.PROCESSED:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This payout has already been processed.")
+
+    payout.status = PayoutStatus.PROCESSED
+    payout.processed_at = datetime.utcnow()
+    payout.razorpay_payout_id = f"payout_sim_{payout.id[:12]}"
+    db.commit()
+
+    _audit(db, admin, "PAYOUT_PROCESSED", "Payout", payout.id, {"amount": float(payout.amount)})
+    return {"id": payout.id, "status": payout.status.value, "processed_at": payout.processed_at}
+
+
+# ── Super Admin: Audit Logs ──────────────────────────────────
+@router.get("/audit-logs", response_model=List[AdminAuditLogOut])
+def list_audit_logs(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    if admin.role != Role.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Audit logs are restricted to Super Admins.")
+
+    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(150).all()
+    results = []
+    for log in logs:
+        actor_name = "System"
+        if log.actor_user_id:
+            profile = db.query(AdminProfile).filter(AdminProfile.user_id == log.actor_user_id).first()
+            if profile:
+                actor_name = profile.full_name
+        results.append(AdminAuditLogOut(
+            id=log.id,
+            actor_user_id=log.actor_user_id,
+            actor_name=actor_name,
+            action=log.action,
+            entity_type=log.entity_type,
+            entity_id=log.entity_id,
+            metadata_json=log.metadata_json,
+            ip_address=log.ip_address,
+            created_at=log.created_at,
+        ))
+    return results
+
+
+# ── Platform Settings ────────────────────────────────────────
+@router.get("/settings", response_model=PlatformSettingsOut)
+def get_platform_settings(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    comm = db.query(PlatformSetting).filter(PlatformSetting.key == "default_commission_pct").first()
+    surge = db.query(PlatformSetting).filter(PlatformSetting.key == "surge_multiplier").first()
+    sos = db.query(PlatformSetting).filter(PlatformSetting.key == "sos_emergency_phone").first()
+
+    return PlatformSettingsOut(
+        default_commission_pct=float(comm.value) if comm else 15.0,
+        surge_multiplier=float(surge.value) if surge else 1.0,
+        otp_expiry_seconds=settings.OTP_EXPIRY_SECONDS,
+        sos_emergency_phone=sos.value if sos else "+911800123456",
+        sms_provider=settings.SMS_PROVIDER,
+        environment=settings.ENVIRONMENT,
+    )
+
+
+@router.patch("/settings")
+def update_platform_settings(payload: UpdatePlatformSettingsIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+    if admin.role != Role.SUPER_ADMIN:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Super Admins can update platform global settings.")
+
+    if payload.default_commission_pct is not None:
+        row = db.query(PlatformSetting).filter(PlatformSetting.key == "default_commission_pct").first()
+        if not row:
+            db.add(PlatformSetting(key="default_commission_pct", value=str(payload.default_commission_pct)))
+        else:
+            row.value = str(payload.default_commission_pct)
+
+    if payload.surge_multiplier is not None:
+        row = db.query(PlatformSetting).filter(PlatformSetting.key == "surge_multiplier").first()
+        if not row:
+            db.add(PlatformSetting(key="surge_multiplier", value=str(payload.surge_multiplier)))
+        else:
+            row.value = str(payload.surge_multiplier)
+
+    if payload.sos_emergency_phone is not None:
+        row = db.query(PlatformSetting).filter(PlatformSetting.key == "sos_emergency_phone").first()
+        if not row:
+            db.add(PlatformSetting(key="sos_emergency_phone", value=str(payload.sos_emergency_phone)))
+        else:
+            row.value = str(payload.sos_emergency_phone)
+
+    db.commit()
+    _audit(db, admin, "PLATFORM_SETTINGS_UPDATED", "PlatformSetting", "global", payload.model_dump(exclude_unset=True))
+    return {"message": "Platform settings updated successfully"}
