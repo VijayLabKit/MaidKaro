@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <div className="mb-3">
             <span className="relative block h-10 w-32">
-              <Image src="/logo-full-dark.png" alt="MaidKaro" fill className="object-contain object-left" />
+              <Image src="/logo-full-dark.png" alt="MaidKaro" fill sizes="130px" className="object-contain object-left" />
             </span>
           </div>
           <p className="text-sm leading-relaxed">

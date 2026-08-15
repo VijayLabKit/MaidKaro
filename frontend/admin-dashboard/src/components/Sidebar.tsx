@@ -35,7 +35,7 @@ export function Sidebar() {
     <aside className="w-64 shrink-0 bg-primary min-h-screen flex flex-col">
       <div className="flex items-center gap-3 px-6 py-6 border-b border-white/10">
         <div className="relative h-10 w-10 shrink-0">
-          <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill className="object-contain" />
+          <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill sizes="40px" className="object-contain" />
         </div>
         <div>
           <p className="text-white font-semibold text-sm tracking-wide">MAIDKARO</p>

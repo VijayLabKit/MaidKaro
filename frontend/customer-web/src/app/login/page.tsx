@@ -64,7 +64,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
           <div className="relative h-16 w-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-gold-400/20 to-gold-600/20 border border-gold-400/30 flex items-center justify-center overflow-hidden">
-            <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill className="object-contain p-2.5" />
+            <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill sizes="64px" className="object-contain p-2.5" />
           </div>
           <CardTitle className="text-xl">
             {step === "phone" ? "Log in or sign up" : "Enter OTP"}

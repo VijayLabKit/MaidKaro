@@ -26,7 +26,7 @@ export function SiteHeader() {
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center shrink-0" onClick={() => setOpen(false)}>
           <span className="relative h-10 w-32">
-            <Image src="/logo-full-light.png" alt="MaidKaro — Reliable help at your doorstep" fill className="object-contain object-left" priority />
+            <Image src="/logo-full-light.png" alt="MaidKaro — Reliable help at your doorstep" fill sizes="130px" className="object-contain object-left" priority />
           </span>
         </Link>
 
