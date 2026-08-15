@@ -39,18 +39,20 @@ export default function WorkersPage() {
       ) : (
         <div className="grid gap-3">
           {pending.map((w) => (
-            <Card key={w.id} className="flex items-center justify-between py-4">
-              <div>
-                <p className="font-medium text-navy-900">{w.fullName}</p>
-                <p className="text-sm text-navy-700/50 mt-0.5">
-                  {w.city.name} · {w.yearsExperience} yrs exp · {w.skills.map((s) => s.category.name).join(', ') || 'No skills added'}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <StatusBadge status={w.verificationStatus} />
-                <Button variant="secondary" onClick={() => setSelectedId(w.id)}>
-                  Review
-                </Button>
+            <Card key={w.id}>
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="font-semibold text-base text-foreground">{w.fullName}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {w.city.name} · {w.yearsExperience} yrs exp · {w.skills.map((s) => s.category.name).join(', ') || 'No skills added'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <StatusBadge status={w.verificationStatus} />
+                  <Button variant="secondary" onClick={() => setSelectedId(w.id)}>
+                    Review
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
