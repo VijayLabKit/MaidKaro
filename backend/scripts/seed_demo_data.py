@@ -27,6 +27,7 @@ from app.database.models import (
     Payment, PaymentStatus, Review, PayoutLedgerEntry, Payout, PayoutStatus,
     Complaint, ComplaintStatus, ComplaintRaisedBy,
     Notification, NotificationChannel, PlatformSetting, OtpCode, AuditLog,
+    SafetyIncident, SafetyIncidentStatus,
 )
 from app.security.security import hash_password
 from scripts.seed import seed as seed_base
@@ -462,40 +463,56 @@ def create_bookings_and_downstream(db, customers, workers, categories, city, adm
 
 def create_payouts(db, workers):
     count = 0
-    for worker in workers:
-        entries = db.query(PayoutLedgerEntry).filter(
-            PayoutLedgerEntry.worker_id == worker.id,
-            PayoutLedgerEntry.is_paid_out.is_(True),
-            PayoutLedgerEntry.payout_id.is_(None),
-        ).all()
-        if not entries:
-            continue
-        total = sum((e.net_amount for e in entries), Decimal("0"))
-        payout = Payout(
-            worker_id=worker.id, amount=total, status=PayoutStatus.PROCESSED,
-            razorpay_payout_id=f"payout_demo_{worker.id[:12]}",
-            requested_at=datetime.utcnow() - timedelta(days=random.randint(5, 30)),
-            processed_at=datetime.utcnow() - timedelta(days=random.randint(0, 3)),
-        )
-        db.add(payout)
-        db.flush()
-        for e in entries:
-            e.payout_id = payout.id
+    approved_workers = [w for w in workers if w.verification_status == VerificationStatus.APPROVED]
+    if not approved_workers:
+        approved_workers = workers
+
+    # 1. 22 Pending Payout Requests ready for the Super Admin to Approve & Settle
+    payout_amounts = [1450.0, 2200.0, 3150.0, 4800.0, 1850.0, 5600.0, 2750.0, 3900.0, 6200.0, 1950.0, 8400.0, 4200.0, 3350.0, 2900.0, 4750.0, 5100.0, 1650.0, 7200.0, 3850.0, 4400.0, 2600.0, 6900.0]
+    for i, worker in enumerate(approved_workers[:22]):
+        amount = Decimal(str(payout_amounts[i % len(payout_amounts)]))
+        db.add(Payout(
+            worker_id=worker.id,
+            amount=amount,
+            status=PayoutStatus.REQUESTED,
+            requested_at=datetime.utcnow() - timedelta(days=random.randint(0, 3), hours=random.randint(1, 20)),
+        ))
         count += 1
 
-    # Pending payout requests
-    for worker in random.sample(workers, k=min(6, len(workers))):
-        pending_entries = db.query(PayoutLedgerEntry).filter(
-            PayoutLedgerEntry.worker_id == worker.id,
-            PayoutLedgerEntry.is_paid_out.is_(False),
-        ).all()
-        if pending_entries:
-            total = sum((e.net_amount for e in pending_entries), Decimal("0"))
-            db.add(Payout(worker_id=worker.id, amount=total, status=PayoutStatus.REQUESTED))
-            count += 1
+    # 2. 35 Processed Historical Payouts
+    for worker in approved_workers[2:37]:
+        amount = Decimal(str(random.choice([2450.0, 3800.0, 5200.0, 4100.0, 7600.0, 1900.0, 3400.0, 8900.0, 6700.0, 4300.0])))
+        req_time = datetime.utcnow() - timedelta(days=random.randint(4, 28))
+        db.add(Payout(
+            worker_id=worker.id,
+            amount=amount,
+            status=PayoutStatus.PROCESSED,
+            razorpay_payout_id=f"pout_demo_{random.randint(10000000, 99999999)}",
+            requested_at=req_time,
+            processed_at=req_time + timedelta(hours=random.randint(2, 24)),
+        ))
+        count += 1
 
     db.flush()
-    print(f"Created {count} demo payout records (processed + pending).")
+    print(f"Created {count} demo payout records (22 pending approvals + 35 processed historical).")
+
+
+def create_safety_incidents(db, bookings):
+    sample = [b for b in bookings if b.worker is not None][:6]
+    statuses = [SafetyIncidentStatus.TRIGGERED, SafetyIncidentStatus.ACKNOWLEDGED, SafetyIncidentStatus.RESOLVED]
+
+    for i, booking in enumerate(sample):
+        db.add(SafetyIncident(
+            booking_id=booking.id,
+            triggered_by_user_id=booking.customer.user_id if i % 2 == 0 else booking.worker.user_id,
+            lat=26.7271 + (random.random() - 0.5) * 0.05,
+            lng=88.3953 + (random.random() - 0.5) * 0.05,
+            status=statuses[i % len(statuses)],
+            notes="Emergency contact verified. Trust & Safety desk conducted welfare call." if statuses[i % len(statuses)] != SafetyIncidentStatus.TRIGGERED else None,
+            created_at=datetime.utcnow() - timedelta(hours=random.randint(2, 48)),
+        ))
+    db.flush()
+    print(f"Created {len(sample)} demo safety incidents across Triggered, Acknowledged, and Resolved.")
 
 
 def create_complaints(db, bookings):
@@ -658,6 +675,7 @@ def seed_demo(force: bool = False):
 
         create_payouts(db, workers)
         create_complaints(db, bookings)
+        create_safety_incidents(db, bookings)
         create_notifications(db, customers, workers, bookings)
         create_audit_logs(db, admin.user_id if admin else None, workers, categories, db.query(Complaint).all())
         seed_platform_settings(db)
