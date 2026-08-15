@@ -40,27 +40,40 @@ export default function CitiesPage() {
       {isLoading || !cities ? (
         <LoadingState />
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           {cities.map((city) => (
             <Card key={city.id}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-navy-900">
-                    {city.name}, {city.state}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${city.isActive ? 'text-emerald-600' : 'text-navy-700/40'}`}>
-                    {city.isActive ? 'Live' : 'Not yet live'}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5">
+                    <p className="font-semibold text-base text-foreground">
+                      {city.name}, {city.state}
+                    </p>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        city.isActive
+                          ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'
+                          : 'bg-muted text-muted-foreground border border-border'
+                      }`}
+                    >
+                      {city.isActive ? 'Live' : 'Not yet live'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Zone-level availability and pricing control active
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2.5 shrink-0 pt-2 sm:pt-0">
                   <Button
                     variant="ghost"
+                    size="sm"
                     onClick={() => setExpandedCityId(expandedCityId === city.id ? null : city.id)}
                   >
                     {expandedCityId === city.id ? 'Hide zones' : 'Manage zones'}
                   </Button>
                   <Button
                     variant={city.isActive ? 'danger' : 'secondary'}
+                    size="sm"
                     onClick={async () => {
                       await api.patch(`/catalog/cities/${city.id}/active`, { isActive: !city.isActive });
                       mutate();

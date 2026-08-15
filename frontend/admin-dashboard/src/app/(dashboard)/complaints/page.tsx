@@ -37,33 +37,41 @@ export default function ComplaintsPage() {
       ) : data.length === 0 ? (
         <EmptyState message="No complaints on file." />
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-4">
           {data.map((c) => (
             <Card key={c.id}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-medium text-navy-900">
-                    {c.booking.category.name} · {c.booking.customer.fullName}
-                    {c.booking.worker ? ` × ${c.booking.worker.fullName}` : ''}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <p className="font-semibold text-base text-foreground">
+                    {c.booking.category.name} <span className="font-normal text-muted-foreground">·</span> {c.booking.customer.fullName}
+                    {c.booking.worker ? <span className="text-primary font-medium"> × {c.booking.worker.fullName}</span> : ''}
                   </p>
-                  <p className="text-xs text-navy-700/50 mt-0.5">
-                    Raised by {c.raisedBy.toLowerCase()} · Booking value ₹{Number(c.booking.priceQuoted).toFixed(0)}
+                  <p className="text-sm text-muted-foreground">
+                    Raised by <strong className="font-medium text-foreground capitalize">{c.raisedBy.toLowerCase()}</strong> · Booking value <span className="font-medium text-foreground">₹{Number(c.booking.priceQuoted).toFixed(0)}</span>
                   </p>
                 </div>
-                <StatusBadge status={c.status} />
+                <div className="flex items-center gap-3 shrink-0">
+                  <StatusBadge status={c.status} />
+                  {c.status !== 'RESOLVED' && c.status !== 'DISMISSED' && (
+                    <Button variant="secondary" onClick={() => setOpenId(c.id)}>
+                      Resolve
+                    </Button>
+                  )}
+                </div>
               </div>
-              <p className="text-sm text-navy-700/80 mt-3">{c.description}</p>
+
+              <div className="mt-3.5 p-3.5 rounded-lg bg-muted/40 border border-border/60 text-sm text-foreground/90">
+                <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-1">Complaint Details</p>
+                <p>{c.description}</p>
+              </div>
+
               {c.resolutionNote && (
-                <p className="text-sm text-navy-700/50 mt-2 border-l-2 border-gold-500/40 pl-3">
-                  Resolution: {c.resolutionNote}
-                  {c.refundIssued ? ` · Refunded ₹${Number(c.refundIssued).toFixed(0)}` : ''}
-                </p>
-              )}
-              {c.status !== 'RESOLVED' && c.status !== 'DISMISSED' && (
-                <div className="mt-3">
-                  <Button variant="secondary" onClick={() => setOpenId(c.id)}>
-                    Resolve
-                  </Button>
+                <div className="mt-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 text-sm">
+                  <p className="font-medium text-xs text-emerald-800 uppercase tracking-wider mb-0.5">Resolution Note</p>
+                  <p>
+                    {c.resolutionNote}
+                    {c.refundIssued ? <strong className="ml-2">· Refunded ₹{Number(c.refundIssued).toFixed(0)}</strong> : ''}
+                  </p>
                 </div>
               )}
             </Card>

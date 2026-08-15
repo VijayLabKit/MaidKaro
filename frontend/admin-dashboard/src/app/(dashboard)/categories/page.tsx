@@ -70,31 +70,53 @@ function CategoryRow({ category, onUpdated }: { category: Category; onUpdated: (
   }
 
   return (
-    <Card className="flex items-center justify-between">
-      <div>
-        <p className="font-medium text-navy-900">{category.name}</p>
-        <p className="text-sm text-navy-700/50 mt-0.5">{category.description}</p>
-        <p className="text-xs text-navy-700/40 mt-1">Base rate ₹{Number(category.baseHourlyRate).toFixed(0)}/hr</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-navy-700/70">
-          Commission
-          <input
-            type="number"
-            min={0}
-            max={50}
-            value={commission}
-            onChange={(e) => setCommission(e.target.value)}
-            className="w-16 rounded-lg border border-navy-900/10 px-2 py-1 text-sm outline-none focus:border-gold-500"
-          />
-          %
-        </label>
-        <Button variant="ghost" disabled={saving} onClick={saveCommission}>
-          Save
-        </Button>
-        <Button variant={category.isActive ? 'danger' : 'secondary'} onClick={toggleActive}>
-          {category.isActive ? 'Deactivate' : 'Activate'}
-        </Button>
+    <Card>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <p className="font-semibold text-base text-foreground">{category.name}</p>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                category.isActive
+                  ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20'
+                  : 'bg-muted text-muted-foreground border border-border'
+              }`}
+            >
+              {category.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground">{category.description}</p>
+          <div className="pt-1">
+            <span className="inline-flex items-center text-xs font-medium text-foreground bg-muted px-2.5 py-1 rounded-md">
+              Base rate: ₹{Number(category.baseHourlyRate).toFixed(0)}/hr
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0 pt-2 sm:pt-0">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-lg border border-border">
+            <span>Commission</span>
+            <input
+              type="number"
+              min={0}
+              max={50}
+              value={commission}
+              onChange={(e) => setCommission(e.target.value)}
+              className="w-14 rounded-md border border-input bg-background px-2 py-0.5 text-sm text-foreground text-center font-medium outline-none focus:ring-1 focus:ring-primary"
+            />
+            <span className="font-medium text-foreground">%</span>
+          </label>
+          <Button variant="ghost" size="sm" disabled={saving} onClick={saveCommission}>
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
+          <Button
+            variant={category.isActive ? 'danger' : 'secondary'}
+            size="sm"
+            onClick={toggleActive}
+          >
+            {category.isActive ? 'Deactivate' : 'Activate'}
+          </Button>
+        </div>
       </div>
     </Card>
   );
