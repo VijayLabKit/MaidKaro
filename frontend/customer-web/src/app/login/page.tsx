@@ -97,6 +97,16 @@ export default function LoginPage() {
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Send OTP
               </Button>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPhone("9876543210")}
+                  className="w-full text-xs text-muted-foreground hover:text-primary transition-colors py-1 bg-muted/60 rounded-md"
+                >
+                  ⚡ Fill Demo Phone: <strong>9876543210</strong>
+                </button>
+              </div>
             </form>
           ) : (
             <form onSubmit={handleVerify} className="space-y-4">
@@ -111,7 +121,16 @@ export default function LoginPage() {
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                 />
                 {devOtp && (
-                  <p className="text-xs text-muted-foreground">Dev mode — your code is {devOtp}</p>
+                  <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 text-xs flex items-center justify-between mt-1">
+                    <span>Dev mode OTP: <strong className="font-mono text-sm">{devOtp}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => setOtp(devOtp)}
+                      className="underline font-semibold hover:text-amber-950 px-2 py-0.5 rounded bg-amber-500/20"
+                    >
+                      Auto-fill
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="space-y-1.5">
