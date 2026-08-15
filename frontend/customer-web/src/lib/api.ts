@@ -217,10 +217,16 @@ export const requestOtp = (phone: string, purpose: "LOGIN" | "SIGNUP" = "LOGIN")
     body: JSON.stringify({ phone, purpose }),
   });
 
-export const verifyOtp = (phone: string, code: string, fullName?: string) =>
+export const verifyOtp = (phone: string, code: string, fullName?: string, email?: string) =>
   apiFetch<TokenPair>("/auth/otp/verify", {
     method: "POST",
-    body: JSON.stringify({ phone, code, role: "CUSTOMER", full_name: fullName || undefined }),
+    body: JSON.stringify({
+      phone,
+      code,
+      role: "CUSTOMER",
+      full_name: fullName || undefined,
+      email: email || undefined,
+    }),
   });
 
 // ── Authenticated: profile & addresses ──────────────────────────────

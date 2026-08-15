@@ -29,7 +29,8 @@ class VerifyOtpIn(BaseModel):
     phone: str
     code: str = Field(..., min_length=4, max_length=6)
     role: str = Field("CUSTOMER", pattern="^(CUSTOMER|WORKER)$")
-    full_name: Optional[str] = None  # required on first-time signup
+    full_name: Optional[str] = None  # optional on first-time signup
+    email: Optional[str] = None      # optional email for invoices & receipts
 
 
 class TokenPairOut(BaseModel):

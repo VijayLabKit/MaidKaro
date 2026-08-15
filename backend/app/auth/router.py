@@ -27,7 +27,7 @@ def request_otp(payload: RequestOtpIn, db: Session = Depends(get_db)):
 @router.post("/otp/verify", response_model=TokenPairOut)
 def verify_otp(payload: VerifyOtpIn, db: Session = Depends(get_db)):
     user, access, refresh, is_new = service.verify_otp_and_login(
-        db, payload.phone, payload.code, payload.role, payload.full_name
+        db, payload.phone, payload.code, payload.role, payload.full_name, payload.email
     )
     return TokenPairOut(
         access_token=access, refresh_token=refresh,

@@ -15,7 +15,7 @@ interface AuthContextValue {
   user: AppUser | null;
   isLoading: boolean;
   requestOtp: (phone: string) => Promise<{ devOtp: string | null }>;
-  verifyOtp: (phone: string, otp: string, fullName?: string) => Promise<void>;
+  verifyOtp: (phone: string, otp: string, fullName?: string, email?: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -68,9 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { devOtp: result.dev_otp };
   }
 
-  async function verifyOtp(phone: string, otp: string, fullName?: string) {
+  async function verifyOtp(phone: string, otp: string, fullName?: string, email?: string) {
     const formatted = formatE164(phone);
-    const tokenPair = await apiVerifyOtp(formatted, otp, fullName);
+    const tokenPair = await apiVerifyOtp(formatted, otp, fullName, email);
     setStoredTokens({
       accessToken: tokenPair.access_token,
       refreshToken: tokenPair.refresh_token,

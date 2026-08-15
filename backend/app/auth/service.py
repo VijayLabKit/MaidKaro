@@ -42,7 +42,7 @@ def request_otp(db: Session, phone: str, purpose: str) -> Tuple[str, int]:
 
 
 def verify_otp_and_login(
-    db: Session, phone: str, code: str, role: str, full_name: Optional[str]
+    db: Session, phone: str, code: str, role: str, full_name: Optional[str] = None, email: Optional[str] = None
 ) -> Tuple[User, str, str, bool]:
     otp = (
         db.query(OtpCode)
@@ -75,16 +75,37 @@ def verify_otp_and_login(
         db.flush()  # get user.id before creating the profile
 
         if role == "CUSTOMER":
-            db.add(CustomerProfile(user_id=user.id, full_name=full_name or "MaidKaro Customer"))
+            db.add(CustomerProfile(
+                user_id=user.id,
+                full_name=full_name or "MaidKaro Customer",
+                email=email
+            ))
         elif role == "WORKER":
             default_city = db.query(City).filter(City.is_active.is_(True)).first()
             if not default_city:
                 raise HTTPException(status.HTTP_400_BAD_REQUEST, "No active city configured for worker signup")
-            db.add(WorkerProfile(user_id=user.id, full_name=full_name or "MaidKaro Worker", city_id=default_city.id))
+            db.add(WorkerProfile(
+                user_id=user.id,
+                full_name=full_name or "MaidKaro Worker",
+                city_id=default_city.id
+            ))
         db.commit()
         db.refresh(user)
     elif not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been deactivated. Contact support.")
+    else:
+        # If existing customer and email/name provided, update their profile
+        if role == "CUSTOMER" and user.customer_profile:
+            updated = False
+            if email and not user.customer_profile.email:
+                user.customer_profile.email = email
+                updated = True
+            if full_name and user.customer_profile.full_name == "MaidKaro Customer":
+                user.customer_profile.full_name = full_name
+                updated = True
+            if updated:
+                db.commit()
+                db.refresh(user)
 
     access_token = create_access_token(subject=user.id, role=user.role.value)
     refresh_token = issue_refresh_token(db, user.id)

@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
@@ -50,7 +51,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      await verifyOtp(phone, otp, fullName);
+      await verifyOtp(phone, otp, fullName || undefined, email || undefined);
       router.push("/bookings");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "That code didn't work. Please try again.");
@@ -141,8 +142,12 @@ export default function LoginPage() {
                 )}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="name">Your name (first time only)</Label>
+                <Label htmlFor="name">Your name (optional)</Label>
                 <Input id="name" placeholder="e.g. Ananya Sharma" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email address (optional)</Label>
+                <Input id="email" type="email" placeholder="e.g. ananya@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" variant="gold" className="w-full" disabled={loading}>
