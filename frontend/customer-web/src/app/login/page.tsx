@@ -63,8 +63,15 @@ export default function LoginPage() {
     <div className="container flex items-center justify-center py-20 min-h-[70vh]">
       <Card className="w-full max-w-sm">
         <CardHeader className="items-center text-center">
-          <div className="relative h-16 w-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-gold-400/20 to-gold-600/20 border border-gold-400/30 flex items-center justify-center overflow-hidden">
-            <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill sizes="64px" className="object-contain p-2.5" />
+          <div className="relative h-24 w-36 mx-auto mb-2 flex items-center justify-center">
+            <Image
+              src="/logo-light-transparent.png"
+              alt="MaidKaro"
+              fill
+              sizes="144px"
+              className="object-contain"
+              priority
+            />
           </div>
           <CardTitle className="text-xl">
             {step === "phone" ? "Log in or sign up" : "Enter OTP"}
