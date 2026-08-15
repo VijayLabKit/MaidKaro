@@ -146,7 +146,6 @@ class User(Base):
     worker_profile = relationship("WorkerProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     admin_profile = relationship("AdminProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
-    otp_codes = relationship("OtpCode", back_populates="user")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     device_tokens = relationship("DeviceToken", back_populates="user", cascade="all, delete-orphan")
@@ -157,15 +156,13 @@ class OtpCode(Base):
     __tablename__ = "otp_codes"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    user_phone = Column(String, ForeignKey("users.phone"), index=True, nullable=False)
+    user_phone = Column(String, index=True, nullable=False)
     code_hash = Column(String, nullable=False)
     purpose = Column(String, nullable=False)  # LOGIN | SIGNUP
     expires_at = Column(DateTime, nullable=False)
     consumed_at = Column(DateTime, nullable=True)
     attempts = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    user = relationship("User", back_populates="otp_codes")
 
 
 class RefreshToken(Base):
