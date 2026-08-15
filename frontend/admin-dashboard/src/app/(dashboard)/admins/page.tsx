@@ -5,10 +5,9 @@ import useSWR from 'swr';
 import { api, fetcher, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { PageHeader, Card, Button, StatusBadge, LoadingState, EmptyState } from '@/components/ui';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, Crown, UserPlus, Phone, Mail, Lock, ShieldAlert } from 'lucide-react';
+import { ShieldCheck, Crown, UserPlus, Phone, Mail, Lock, ShieldAlert, X } from 'lucide-react';
 
 interface StaffMember {
   id: string;
@@ -167,77 +166,86 @@ export default function StaffManagementPage() {
       )}
 
       {/* Provision Admin Modal */}
-      <Dialog open={showInviteModal} onOpenChange={setShowInviteModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Provision Admin / Staff Account</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateStaff} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="s-name">Full Name</Label>
-              <Input
-                id="s-name"
-                placeholder="e.g. Priyanka Sen"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="s-email">Work Email</Label>
-              <Input
-                id="s-email"
-                type="email"
-                placeholder="e.g. priyanka.ops@maidkaro.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="s-phone">Phone Number (10 Digits)</Label>
-              <Input
-                id="s-phone"
-                placeholder="e.g. 9876543210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="s-password">Initial Temporary Password</Label>
-              <Input
-                id="s-password"
-                type="password"
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="s-role">Administrative Role</Label>
-              <select
-                id="s-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as 'ADMIN' | 'SUPER_ADMIN')}
-                className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm outline-none focus:ring-1 focus:ring-primary"
-              >
-                <option value="ADMIN">Operations Admin (Field verification, complaints, logistics)</option>
-                <option value="SUPER_ADMIN">Super Admin (Full financial, legal &amp; governance control)</option>
-              </select>
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-navy-900/50 flex items-center justify-center p-6 z-50" onClick={() => setShowInviteModal(false)}>
+          <div className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Provision Admin / Staff Account</h2>
+              <button onClick={() => setShowInviteModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X size={18} />
+              </button>
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            <form onSubmit={handleCreateStaff} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="s-name">Full Name</Label>
+                <Input
+                  id="s-name"
+                  placeholder="e.g. Priyanka Sen"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-email">Work Email</Label>
+                <Input
+                  id="s-email"
+                  type="email"
+                  placeholder="e.g. priyanka.ops@maidkaro.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-phone">Phone Number (10 Digits)</Label>
+                <Input
+                  id="s-phone"
+                  placeholder="e.g. 9876543210"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-password">Initial Temporary Password</Label>
+                <Input
+                  id="s-password"
+                  type="password"
+                  placeholder="••••••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-role">Administrative Role</Label>
+                <select
+                  id="s-role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as 'ADMIN' | 'SUPER_ADMIN')}
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="ADMIN">Operations Admin (Field verification, complaints, logistics)</option>
+                  <option value="SUPER_ADMIN">Super Admin (Full financial, legal &amp; governance control)</option>
+                </select>
+              </div>
 
-            <DialogFooter className="pt-2">
-              <Button type="submit" variant="gold" disabled={submitting}>
-                {submitting ? 'Creating...' : 'Create Account'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <Button type="button" variant="ghost" onClick={() => setShowInviteModal(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="gold" disabled={submitting}>
+                  {submitting ? 'Creating...' : 'Create Account'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
