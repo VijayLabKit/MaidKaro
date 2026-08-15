@@ -96,3 +96,14 @@ cd frontend/customer-web && npm run build
 # Admin Dashboard
 cd frontend/admin-dashboard && npm run build
 ```
+
+---
+
+## 🔒 Legal & Copyright
+
+Copyright © 2026 VijayLabKit & Ishan Chowdhury. All Rights Reserved.
+
+This repository contains proprietary source code for the **MaidKaro** platform. 
+* **No Replication:** Unauthorized copying, cloning, or distribution of this code is strictly prohibited.
+* **Commercial Protection:** This architecture and business logic are protected for future commercial development.
+
