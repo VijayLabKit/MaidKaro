@@ -81,8 +81,8 @@ export default function WorkerRegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!/^\d{10}$/.test(phone)) {
-      setError("Please enter a valid 10-digit mobile number.");
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      setError("Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.");
       return;
     }
     if (password.length < 8) {

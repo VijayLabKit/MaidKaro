@@ -21,16 +21,40 @@ export class ApiError extends Error {
   }
 }
 
+export function formatErrorDetail(detail: any, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((err) => {
+        if (typeof err === "string") return err;
+        const msg = err.msg || err.message || "";
+        const cleanMsg = msg.replace(/^Value error,\s*/i, "");
+        const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : "";
+        if (cleanMsg) {
+          return field && field !== "body" ? `${field}: ${cleanMsg}` : cleanMsg;
+        }
+        return JSON.stringify(err);
+      })
+      .filter(Boolean)
+      .join(". ");
+  }
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string") return detail.message;
+    if (typeof detail.msg === "string") return detail.msg;
+  }
+  return fallback;
+}
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let message = res.statusText;
     try {
       const body = await res.json();
-      message = body.detail || message;
+      message = formatErrorDetail(body.detail, message);
     } catch {
       // response wasn't JSON — fall back to statusText
     }
-    throw new ApiError(res.status, typeof message === "string" ? message : JSON.stringify(message));
+    throw new ApiError(res.status, typeof message === "string" ? message : res.statusText || "Request failed");
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

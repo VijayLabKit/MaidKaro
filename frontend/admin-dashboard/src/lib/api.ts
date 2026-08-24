@@ -124,7 +124,21 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   if (!res.ok) {
     const detail = (raw as { detail?: unknown }).detail;
-    const message = typeof detail === 'string' ? detail : res.statusText || 'Something went wrong';
+    let message = res.statusText || 'Something went wrong';
+    if (typeof detail === 'string') {
+      message = detail;
+    } else if (Array.isArray(detail)) {
+      message = detail
+        .map((err) => {
+          if (typeof err === 'string') return err;
+          const msg = err.msg || err.message || '';
+          const cleanMsg = msg.replace(/^Value error,\s*/i, '');
+          const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : '';
+          return field && field !== 'body' ? `${field}: ${cleanMsg}` : cleanMsg;
+        })
+        .filter(Boolean)
+        .join('. ');
+    }
     throw new ApiError(res.status, String(res.status), message);
   }
 

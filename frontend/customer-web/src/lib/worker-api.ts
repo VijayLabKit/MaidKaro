@@ -34,16 +34,18 @@ export function clearWorkerTokens() {
   window.localStorage.removeItem(WORKER_TOKEN_KEY);
 }
 
+import { formatErrorDetail } from "./api";
+
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let message = res.statusText;
     try {
       const body = await res.json();
-      message = body.detail || message;
+      message = formatErrorDetail(body.detail, message);
     } catch {
       // not JSON
     }
-    throw new ApiError(res.status, typeof message === "string" ? message : JSON.stringify(message));
+    throw new ApiError(res.status, typeof message === "string" ? message : res.statusText || "Request failed");
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
