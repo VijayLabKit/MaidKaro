@@ -102,7 +102,7 @@ export function WorkerNotificationBell({ className }: { className?: string }) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl border border-border bg-card p-3 shadow-lg z-50 text-card-foreground">
+        <div className="absolute left-0 mt-2 w-80 sm:w-88 rounded-xl border border-border bg-card p-3.5 shadow-2xl z-50 text-card-foreground animate-in fade-in-50 zoom-in-95">
           <div className="flex items-center justify-between border-b border-border pb-2 mb-2">
             <h4 className="text-sm font-semibold">Worker Alerts</h4>
             {unreadCount > 0 && (
