@@ -117,6 +117,13 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
           ...options.headers,
         },
       });
+    } else {
+      localStorage.removeItem('maidkaro_admin_access_token');
+      localStorage.removeItem('maidkaro_admin_refresh_token');
+      localStorage.removeItem('maidkaro_admin_user');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
   }
 

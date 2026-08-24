@@ -95,13 +95,13 @@ export default function RegisterPage() {
           {/* Header */}
           <div className="relative z-10 space-y-6">
             <Link href="/" className="inline-flex items-center gap-2">
-              <div className="relative h-10 w-36">
+              <div className="relative h-10 w-40">
                 <Image
-                  src="/logo-full-light.png"
+                  src="/logo-full-dark.png"
                   alt="MaidKaro"
                   fill
-                  sizes="144px"
-                  className="object-contain object-left brightness-0 invert"
+                  sizes="160px"
+                  className="object-contain object-left"
                   priority
                 />
               </div>
