@@ -59,7 +59,11 @@ export default function WorkerKycPage() {
     load();
   }, []);
 
-  const isEditable = kyc && (kyc.verification_status === "NOT_SUBMITTED" || kyc.verification_status === "NEEDS_RESUBMISSION");
+  const isEditable = kyc && (
+    kyc.verification_status === "NOT_SUBMITTED" ||
+    kyc.verification_status === "NEEDS_RESUBMISSION" ||
+    kyc.verification_status === "REJECTED"
+  );
 
   async function handleSaveProfile() {
     setSaving(true);
@@ -136,24 +140,33 @@ export default function WorkerKycPage() {
         <p className="text-sm text-muted-foreground mt-0.5">Complete your profile and upload documents to get verified.</p>
       </div>
 
-      {kyc.verification_status === "REJECTED" && kyc.verification_note && (
-        <Card className="border-red-500/30 bg-red-500/5">
+      {kyc.verification_status === "REJECTED" && (
+        <Card className="border-red-500/40 bg-red-500/10">
           <CardContent className="p-4 flex gap-3">
             <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-red-700">Verification not approved</p>
-              <p className="text-sm text-red-700/80 mt-0.5">{kyc.verification_note}</p>
+              <p className="text-sm font-semibold text-red-700">Verification Rejected</p>
+              <p className="text-sm text-red-700/90 mt-0.5">
+                {kyc.verification_note
+                  ? `Reason: ${kyc.verification_note}`
+                  : "Your submitted documents or profile were not approved. Please review your information, re-upload clear document photos, and click 'Submit for review' below."}
+              </p>
             </div>
           </CardContent>
         </Card>
       )}
-      {kyc.verification_status === "NEEDS_RESUBMISSION" && kyc.verification_note && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
+
+      {kyc.verification_status === "NEEDS_RESUBMISSION" && (
+        <Card className="border-amber-500/40 bg-amber-500/10">
           <CardContent className="p-4 flex gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-amber-700">Resubmission needed</p>
-              <p className="text-sm text-amber-700/80 mt-0.5">{kyc.verification_note}</p>
+              <p className="text-sm font-semibold text-amber-700">Document Resubmission Requested</p>
+              <p className="text-sm text-amber-700/90 mt-0.5">
+                {kyc.verification_note
+                  ? `Admin note: ${kyc.verification_note}`
+                  : "Some documents need to be re-uploaded. Please update your details and replace the flagged documents below."}
+              </p>
             </div>
           </CardContent>
         </Card>

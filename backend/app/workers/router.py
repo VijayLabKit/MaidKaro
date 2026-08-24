@@ -148,10 +148,17 @@ def upload_kyc_document(payload: KycUploadIn, user: User = Depends(require_roles
     info are on file, matching the spec's distinct 'documents submitted'
     vs 'verification pending' stages."""
     p = _get_worker_profile(db, user)
-    if p.verification_status not in (VerificationStatus.NOT_SUBMITTED, VerificationStatus.NEEDS_RESUBMISSION):
+    if p.verification_status not in (VerificationStatus.NOT_SUBMITTED, VerificationStatus.NEEDS_RESUBMISSION, VerificationStatus.REJECTED):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Documents can only be uploaded before or during resubmission")
-    doc = KycDocument(worker_id=p.id, type=payload.type, file_url=payload.file_url)
-    db.add(doc)
+    existing_doc = db.query(KycDocument).filter(KycDocument.worker_id == p.id, KycDocument.type == payload.type).first()
+    if existing_doc:
+        existing_doc.file_url = payload.file_url
+        existing_doc.status = VerificationStatus.PENDING_REVIEW
+        existing_doc.reject_reason = None
+        doc = existing_doc
+    else:
+        doc = KycDocument(worker_id=p.id, type=payload.type, file_url=payload.file_url)
+        db.add(doc)
     db.commit()
     db.refresh(doc)
     return doc
@@ -183,10 +190,6 @@ def get_my_kyc_profile(user: User = Depends(require_roles(Role.WORKER)), db: Ses
 def update_my_kyc_profile(
     payload: WorkerKycProfileIn, user: User = Depends(require_roles(Role.WORKER)), db: Session = Depends(get_db),
 ):
-    """Saves personal + professional KYC fields. Can be called repeatedly
-    while still in NOT_SUBMITTED / NEEDS_RESUBMISSION — it only advances the
-    state machine (-> PENDING_REVIEW) once required documents are also on
-    file, via POST /me/kyc-profile/submit below."""
     p = _get_worker_profile(db, user)
     if p.verification_status in (VerificationStatus.PENDING_REVIEW, VerificationStatus.APPROVED):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Your profile is already submitted or approved and can't be edited. Contact support for changes.")
@@ -206,11 +209,8 @@ def update_my_kyc_profile(
 
 @router.post("/me/kyc-profile/submit", response_model=WorkerKycProfileOut)
 def submit_kyc_for_review(user: User = Depends(require_roles(Role.WORKER)), db: Session = Depends(get_db)):
-    """Registered -> Documents Submitted -> Verification Pending. Requires
-    both the personal-info fields and the mandatory document types to be on
-    file before it will move the worker into the admin review queue."""
     p = _get_worker_profile(db, user)
-    if p.verification_status not in (VerificationStatus.NOT_SUBMITTED, VerificationStatus.NEEDS_RESUBMISSION):
+    if p.verification_status not in (VerificationStatus.NOT_SUBMITTED, VerificationStatus.NEEDS_RESUBMISSION, VerificationStatus.REJECTED):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Cannot submit for review from status {p.verification_status.value}")
 
     missing_fields = [f for f in ("address_line", "kyc_city", "kyc_state", "kyc_pincode") if not getattr(p, f)]
@@ -225,6 +225,9 @@ def submit_kyc_for_review(user: User = Depends(require_roles(Role.WORKER)), db: 
     p.verification_status = VerificationStatus.PENDING_REVIEW
     p.verification_note = None
     p.kyc_submitted_at = datetime.utcnow()
+    for doc in p.documents:
+        doc.status = VerificationStatus.PENDING_REVIEW
+        doc.reject_reason = None
     db.commit()
     db.refresh(p)
 

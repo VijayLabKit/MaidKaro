@@ -81,6 +81,15 @@ def act_on_worker_verification(
     }
     worker.verification_status = status_map[payload.action]
     worker.verification_note = payload.note
+
+    doc_status = (
+        VerificationStatus.APPROVED if payload.action == "APPROVE"
+        else (VerificationStatus.REJECTED if payload.action == "REJECT" else VerificationStatus.NEEDS_RESUBMISSION)
+    )
+    for doc in worker.documents:
+        doc.status = doc_status
+        if payload.note:
+            doc.reject_reason = payload.note
     db.commit()
 
     send_push(db, worker.user_id, "KYC update", f"Your verification status is now {worker.verification_status.value}.")

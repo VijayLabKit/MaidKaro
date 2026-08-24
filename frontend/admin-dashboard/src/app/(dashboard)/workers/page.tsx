@@ -169,23 +169,49 @@ function WorkerReviewModal({ workerId, onClose, onDecided }: { workerId: string;
               <p className="text-sm text-navy-700/50">No documents uploaded yet.</p>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {worker.documents.map((doc) => (
-                  <a
-                    key={doc.id}
-                    href={doc.viewUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block rounded-lg border border-navy-900/10 overflow-hidden hover:border-gold-500/50 transition"
-                  >
-                    <div className="aspect-video bg-navy-900/5 flex items-center justify-center text-xs text-navy-700/40">
-                      {doc.type.replaceAll('_', ' ')}
+                {worker.documents.map((doc) => {
+                  const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+                  const fullUrl = doc.viewUrl.startsWith('http')
+                    ? doc.viewUrl
+                    : `${backendBase}${doc.viewUrl.startsWith('/') ? '' : '/'}${doc.viewUrl}`;
+                  const isImage = /\.(jpg|jpeg|png|webp)($|\?)/i.test(doc.viewUrl) || doc.viewUrl.startsWith('data:image');
+
+                  return (
+                    <div
+                      key={doc.id}
+                      className="rounded-lg border border-navy-900/15 overflow-hidden bg-slate-50 flex flex-col justify-between shadow-xs"
+                    >
+                      <div className="relative aspect-video bg-navy-900/5 flex items-center justify-center overflow-hidden group">
+                        {isImage ? (
+                          <img
+                            src={fullUrl}
+                            alt={doc.type}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <div className="text-center p-3">
+                            <span className="text-xs font-semibold text-navy-800">{doc.type.replaceAll('_', ' ')}</span>
+                            <p className="text-[10px] text-navy-500 mt-0.5">PDF / Document file</p>
+                          </div>
+                        )}
+                        <a
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="absolute inset-0 bg-navy-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-semibold gap-1.5 transition-opacity"
+                        >
+                          Open document ↗
+                        </a>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between border-t border-navy-900/10 bg-white">
+                        <span className="text-xs font-semibold text-navy-900 truncate max-w-[130px]" title={doc.type.replaceAll('_', ' ')}>
+                          {doc.type.replaceAll('_', ' ')}
+                        </span>
+                        <StatusBadge status={doc.status} />
+                      </div>
                     </div>
-                    <div className="px-3 py-2 flex items-center justify-between">
-                      <span className="text-xs text-navy-900">{doc.type.replaceAll('_', ' ')}</span>
-                      <StatusBadge status={doc.status} />
-                    </div>
-                  </a>
-                ))}
+                  );
+                })}
               </div>
             )}
 
