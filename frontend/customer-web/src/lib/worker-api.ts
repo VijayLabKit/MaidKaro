@@ -295,6 +295,14 @@ export const getCategoriesPublic = () => workerFetch<ApiCategorySimple[]>("/cata
 // ── Worker: profile & skills ──────────────────────────────────────────
 
 export const getMyWorkerProfile = () => workerFetchAuthed<WorkerProfileMe>("/workers/me");
+export const updateMyWorkerProfile = (payload: {
+  full_name?: string;
+  bio?: string;
+  photo_url?: string;
+  languages?: string[];
+  years_experience?: number;
+}) => workerFetchAuthed<WorkerProfileMe>("/workers/me", { method: "PATCH", body: JSON.stringify(payload) });
+
 export const getMySkills = () => workerFetchAuthed<WorkerSkillItem[]>("/workers/me/skills");
 export const setMySkills = (skills: SkillPayload[]) =>
   workerFetchAuthed<WorkerSkillItem[]>("/workers/me/skills", {

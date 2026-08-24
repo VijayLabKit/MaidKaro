@@ -210,6 +210,7 @@ def register_worker(
     city_id: str, years_experience: int = 0, languages: Optional[list] = None,
     category_ids: Optional[list] = None,
     skills: Optional[list] = None,
+    bio: Optional[str] = None,
 ) -> Tuple[User, str, str]:
     weakness = validate_password_strength(password)
     if weakness:
@@ -231,12 +232,19 @@ def register_worker(
     db.add(user)
     db.flush()
 
+    cleaned_name = full_name.strip()
+    default_bio = bio.strip() if bio and bio.strip() else (
+        f"{cleaned_name} has {years_experience} years of professional experience delivering reliable, "
+        f"verified household and domestic help services in {city.name}."
+    )
+
     worker_profile = WorkerProfile(
         user_id=user.id,
-        full_name=full_name.strip(),
+        full_name=cleaned_name,
         city_id=city.id,
         years_experience=years_experience,
         languages=languages or [],
+        bio=default_bio,
     )
     db.add(worker_profile)
     db.flush()

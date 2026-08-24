@@ -101,6 +101,7 @@ class RegisterWorkerIn(BaseModel):
     languages: list[str] = Field(default_factory=list)
     category_ids: list[str] = Field(default_factory=list)
     skills: list[RegisterWorkerSkillIn] = Field(default_factory=list)
+    bio: Optional[str] = None
 
     @field_validator("phone")
     @classmethod

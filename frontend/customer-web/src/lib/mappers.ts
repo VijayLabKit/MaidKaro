@@ -21,11 +21,14 @@ export function toWorkerSummary(w: ApiWorkerPublic): WorkerSummary {
     if (!min || (s.hourly_rate > 0 && s.hourly_rate < min.hourly_rate)) return s;
     return min;
   }, null);
+  const cityName = w.city || "Siliguri";
+  const defaultBio = `${w.full_name} has ${w.years_experience} years of professional experience delivering reliable, verified household services in ${cityName}.`;
+
   return {
     id: w.id,
     fullName: w.full_name,
     photoUrl: w.photo_url || undefined,
-    bio: w.bio || undefined,
+    bio: (w.bio && w.bio.trim().length > 0) ? w.bio : defaultBio,
     languages: w.languages,
     yearsExperience: w.years_experience,
     ratingAvg: w.rating_avg,
@@ -33,7 +36,7 @@ export function toWorkerSummary(w: ApiWorkerPublic): WorkerSummary {
     isAvailableNow: w.is_available_now,
     categorySlugs: w.skills.map((s) => s.category_slug),
     hourlyRate: (cheapest?.hourly_rate && cheapest.hourly_rate > 0) ? cheapest.hourly_rate : 249,
-    city: w.city || "Siliguri",
+    city: cityName,
   };
 }
 

@@ -1,14 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, Check, Loader2, Save, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Sparkles, Check, Loader2, Save, AlertCircle, CheckCircle2, UserCheck, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { getCategoriesPublic, getMySkills, setMySkills, ApiCategorySimple, WorkerSkillItem, ApiError } from "@/lib/worker-api";
+import {
+  getCategoriesPublic,
+  getMySkills,
+  setMySkills,
+  getMyWorkerProfile,
+  updateMyWorkerProfile,
+  ApiCategorySimple,
+  ApiError,
+} from "@/lib/worker-api";
 
 export default function WorkerServicesPage() {
   const [categories, setCategories] = useState<ApiCategorySimple[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<{ [catId: string]: number }>({});
+  const [bio, setBio] = useState("");
+  const [fullName, setFullName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -17,11 +27,14 @@ export default function WorkerServicesPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [cats, mySkills] = await Promise.all([
+        const [cats, mySkills, profile] = await Promise.all([
           getCategoriesPublic(),
           getMySkills(),
+          getMyWorkerProfile(),
         ]);
         setCategories(cats);
+        setFullName(profile.full_name);
+        setBio(profile.bio || `${profile.full_name} has ${profile.years_experience} years of professional experience delivering reliable, verified household services in Siliguri.`);
 
         const skillsMap: { [catId: string]: number } = {};
         mySkills.forEach((s) => {
@@ -80,10 +93,13 @@ export default function WorkerServicesPage() {
         category_id,
         hourly_rate: Number(hourly_rate) || 200,
       }));
-      await setMySkills(payload);
+      await Promise.all([
+        setMySkills(payload),
+        updateMyWorkerProfile({ bio }),
+      ]);
       setSavedSuccess(true);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Failed to save services");
+      setError(e instanceof ApiError ? e.message : "Failed to save profile & services");
     } finally {
       setIsSaving(false);
     }
@@ -103,7 +119,7 @@ export default function WorkerServicesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Services &amp; Hourly Rates</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Configure the services you offer to customers and customize your hourly rates (₹/hr).
+            Configure the services you offer, set your hourly rates (₹/hr), and update your customer-facing description.
           </p>
         </div>
         <Button
@@ -119,7 +135,7 @@ export default function WorkerServicesPage() {
       {savedSuccess && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 text-sm flex items-center gap-2.5">
           <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-          <span>Your services and hourly rates have been updated successfully!</span>
+          <span>Your services, rates, and profile bio have been updated successfully!</span>
         </div>
       )}
 
@@ -130,11 +146,40 @@ export default function WorkerServicesPage() {
         </div>
       )}
 
+      {/* Profile Bio & Introduction Card */}
       <Card className="border-border">
         <CardHeader>
-          <CardTitle className="text-base font-semibold">Available Service Categories</CardTitle>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            About You &amp; Professional Bio
+          </CardTitle>
           <CardDescription className="text-xs">
-            Toggle which services you are trained and ready to perform. You will appear in customer searches for all enabled services once KYC verified.
+            This summary is shown to customers when browsing helpers and on your public booking profile.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <textarea
+            value={bio}
+            onChange={(e) => {
+              setBio(e.target.value);
+              setSavedSuccess(false);
+            }}
+            rows={3}
+            className="w-full rounded-xl border border-input bg-background/60 p-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            placeholder="e.g. Ramesh has 2 years of professional experience delivering reliable, verified household and cleaning services in Siliguri."
+          />
+        </CardContent>
+      </Card>
+
+      {/* Available Services */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Available Service Categories
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Toggle which services you are ready to perform. You will appear in customer searches for all enabled services once KYC verified.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
