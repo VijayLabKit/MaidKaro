@@ -133,6 +133,37 @@ async function workerFetchAuthed<T>(path: string, options: RequestInit = {}): Pr
   return handle<T>(res);
 }
 
+export async function uploadWorkerFile(file: File): Promise<{ file_url: string }> {
+  const tokens = getWorkerTokens();
+  if (!tokens) throw new ApiError(401, "Not logged in");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  let res = await fetch(`${API_BASE_URL}/uploads`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${tokens.accessToken}`,
+    },
+    body: formData,
+  });
+
+  if (res.status === 401 && tokens.refreshToken) {
+    const newAccessToken = await tryRefreshWorkerTokens(tokens);
+    if (newAccessToken) {
+      res = await fetch(`${API_BASE_URL}/uploads`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${newAccessToken}`,
+        },
+        body: formData,
+      });
+    }
+  }
+
+  return handle<{ file_url: string }>(res);
+}
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface TokenPair {

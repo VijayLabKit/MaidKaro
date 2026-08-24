@@ -244,7 +244,7 @@ function WorkerProfileModal({
   onClose: () => void;
   onDecided: () => void;
 }) {
-  const { data: worker, isLoading } = useSWR<WorkerDetail>(`/admin/workers/${workerId}`, detailFetcher);
+  const { data: worker, isLoading, error: fetchError } = useSWR<WorkerDetail>(`/admin/workers/${workerId}`, detailFetcher);
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -268,16 +268,35 @@ function WorkerProfileModal({
         className="bg-card text-card-foreground rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 border border-border"
         onClick={(e) => e.stopPropagation()}
       >
-        {isLoading || !worker ? (
+        {fetchError ? (
+          <div className="p-8 text-center space-y-3">
+            <p className="text-sm font-semibold text-destructive">Unable to load worker profile</p>
+            <p className="text-xs text-muted-foreground">{fetchError instanceof ApiError ? fetchError.message : 'Failed to fetch details.'}</p>
+            <Button size="sm" variant="secondary" onClick={onClose}>Close</Button>
+          </div>
+        ) : isLoading || !worker ? (
           <LoadingState />
         ) : (
           <>
             <div className="flex items-start justify-between mb-4 border-b border-border pb-4">
-              <div>
-                <h2 className="text-xl font-bold text-foreground">{worker.fullName}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {worker.city.name} · {worker.languages.join(', ') || 'Languages not specified'}
-                </p>
+              <div className="flex items-center gap-3.5">
+                <div className="h-12 w-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-base overflow-hidden border border-primary/20 shrink-0">
+                  {worker.photoUrl ? (
+                    <img
+                      src={worker.photoUrl.startsWith('http') ? worker.photoUrl : `${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'}${worker.photoUrl}`}
+                      alt={worker.fullName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    worker.fullName.charAt(0)
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">{worker.fullName}</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {worker.city?.name || 'Siliguri'} · {worker.languages?.join(', ') || 'Languages not specified'}
+                  </p>
+                </div>
               </div>
               <StatusBadge status={worker.verificationStatus} />
             </div>

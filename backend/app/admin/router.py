@@ -263,13 +263,13 @@ def _worker_list_item(w: WorkerProfile) -> AdminWorkerListItemOut:
 
 
 @router.get("/workers/pending", response_model=List[AdminWorkerListItemOut])
-def list_pending_workers(admin: User = Depends(require_staff_permission("verification")), db: Session = Depends(get_db)):
+def list_pending_workers(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
     workers = db.query(WorkerProfile).filter(WorkerProfile.verification_status == VerificationStatus.PENDING_REVIEW).all()
     return [_worker_list_item(w) for w in workers]
 
 
 @router.get("/workers/{worker_id}", response_model=AdminWorkerDetailOut)
-def get_worker_detail(worker_id: str, admin: User = Depends(require_staff_permission("verification")), db: Session = Depends(get_db)):
+def get_worker_detail(worker_id: str, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
     worker = db.query(WorkerProfile).filter(WorkerProfile.id == worker_id).first()
     if not worker:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Worker not found")

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Sparkles, Check, Loader2, Save, AlertCircle, CheckCircle2, UserCheck, FileText } from "lucide-react";
+import { useEffect, useState, ChangeEvent } from "react";
+import { Sparkles, Check, Loader2, Save, AlertCircle, CheckCircle2, FileText, Camera, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import {
@@ -10,6 +10,7 @@ import {
   setMySkills,
   getMyWorkerProfile,
   updateMyWorkerProfile,
+  uploadWorkerFile,
   ApiCategorySimple,
   ApiError,
 } from "@/lib/worker-api";
@@ -19,8 +20,10 @@ export default function WorkerServicesPage() {
   const [selectedSkills, setSelectedSkills] = useState<{ [catId: string]: number }>({});
   const [bio, setBio] = useState("");
   const [fullName, setFullName] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +37,7 @@ export default function WorkerServicesPage() {
         ]);
         setCategories(cats);
         setFullName(profile.full_name);
+        setPhotoUrl(profile.photo_url || null);
         setBio(profile.bio || `${profile.full_name} has ${profile.years_experience} years of professional experience delivering reliable, verified household services in Siliguri.`);
 
         const skillsMap: { [catId: string]: number } = {};
@@ -78,6 +82,24 @@ export default function WorkerServicesPage() {
     setSavedSuccess(false);
   }
 
+  async function handlePhotoUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    setIsUploadingPhoto(true);
+    try {
+      const res = await uploadWorkerFile(file);
+      setPhotoUrl(res.file_url);
+      await updateMyWorkerProfile({ photo_url: res.file_url });
+      setSavedSuccess(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to upload photo");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  }
+
   async function handleSave() {
     setError(null);
     setSavedSuccess(false);
@@ -95,7 +117,7 @@ export default function WorkerServicesPage() {
       }));
       await Promise.all([
         setMySkills(payload),
-        updateMyWorkerProfile({ bio }),
+        updateMyWorkerProfile({ bio, photo_url: photoUrl || undefined }),
       ]);
       setSavedSuccess(true);
     } catch (e) {
@@ -117,9 +139,9 @@ export default function WorkerServicesPage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Services &amp; Hourly Rates</h1>
+          <h1 className="text-2xl font-bold text-foreground">Services &amp; Profile Settings</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Configure the services you offer, set your hourly rates (₹/hr), and update your customer-facing description.
+            Manage your profile picture, biography, services offered, and hourly rates (₹/hr).
           </p>
         </div>
         <Button
@@ -135,7 +157,7 @@ export default function WorkerServicesPage() {
       {savedSuccess && (
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 text-sm flex items-center gap-2.5">
           <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
-          <span>Your services, rates, and profile bio have been updated successfully!</span>
+          <span>Your services, rates, photo, and profile bio have been updated successfully!</span>
         </div>
       )}
 
@@ -145,6 +167,66 @@ export default function WorkerServicesPage() {
           <span>{error}</span>
         </div>
       )}
+
+      {/* Profile Photo & Identity Card */}
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Camera className="h-4 w-4 text-primary" />
+            Profile Picture &amp; Identity
+          </CardTitle>
+          <CardDescription className="text-xs">
+            A clear, friendly photo helps customers recognize you and builds trust on the platform.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col sm:flex-row items-center gap-5">
+          <div className="relative group">
+            <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-primary/20 bg-primary/10 flex items-center justify-center font-bold text-2xl text-primary shrink-0 shadow-md">
+              {photoUrl ? (
+                <img
+                  src={photoUrl.startsWith("http") ? photoUrl : `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}${photoUrl}`}
+                  alt={fullName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                fullName.charAt(0)
+              )}
+            </div>
+            <label
+              htmlFor="worker-photo-upload"
+              className="absolute inset-0 rounded-full bg-navy-950/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white text-[11px] font-semibold cursor-pointer transition-opacity"
+            >
+              <Camera className="h-5 w-5 mb-0.5" />
+              Change
+            </label>
+            <input
+              id="worker-photo-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoUpload}
+              disabled={isUploadingPhoto}
+            />
+          </div>
+
+          <div className="space-y-1.5 text-center sm:text-left flex-1">
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <p className="font-semibold text-foreground text-sm">{fullName}</p>
+              <span className="text-xs px-2 py-0.5 rounded-md bg-muted text-muted-foreground font-medium">Service Partner</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Supported formats: JPG, PNG, WEBP (Max 10 MB).</p>
+            <div className="pt-1">
+              <label
+                htmlFor="worker-photo-upload"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-card text-xs font-semibold text-foreground hover:bg-muted cursor-pointer transition-colors shadow-2xs"
+              >
+                {isUploadingPhoto ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {photoUrl ? "Replace profile photo" : "Upload profile picture"}
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Profile Bio & Introduction Card */}
       <Card className="border-border">
