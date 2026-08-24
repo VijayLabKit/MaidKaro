@@ -127,6 +127,9 @@ class AdminWorkerListItemOut(BaseModel):
     languages: List[str] = []
     skills: List[AdminSkillRef] = []
     created_at: datetime
+    phone: Optional[str] = None
+    rating_avg: Optional[float] = 0.0
+    is_available_now: Optional[bool] = False
 
 
 class AdminKycDocumentOut(BaseModel):

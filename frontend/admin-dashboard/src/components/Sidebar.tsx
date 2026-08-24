@@ -19,6 +19,7 @@ import {
   LogOut,
   Crown,
   Lock,
+  Briefcase,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { hasPermission, STAFF_ROLE_LABELS } from '@/lib/permissions';
@@ -26,6 +27,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const OPERATIONS_NAV = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, capability: null },
+  { href: '/worker-directory', label: 'Worker Directory', icon: Briefcase, capability: null },
   { href: '/workers', label: 'Worker Verification', icon: UserCheck, capability: 'verification' as const },
   { href: '/bookings', label: 'Bookings & Dispatch', icon: CalendarClock, capability: null },
   { href: '/customers', label: 'Customer Directory', icon: Users, capability: null },

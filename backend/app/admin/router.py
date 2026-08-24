@@ -97,19 +97,22 @@ def act_on_worker_verification(
     return {"worker_id": worker.id, "verification_status": worker.verification_status.value}
 
 
-@router.get("/workers", response_model=List[AdminWorkerOut])
+@router.get("/workers", response_model=List[AdminWorkerListItemOut])
 def list_workers(
-    verification_status: Optional[str] = Query(None),
+    verification_status: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = Query(None),
     admin: User = Depends(get_current_admin), db: Session = Depends(get_db),
 ):
     q = db.query(WorkerProfile)
-    if verification_status:
+    if verification_status and verification_status != "ALL":
         q = q.filter(WorkerProfile.verification_status == VerificationStatus(verification_status))
-    workers = q.order_by(WorkerProfile.created_at.desc()).limit(200).all()
-    return [AdminWorkerOut(
-        id=w.id, full_name=w.full_name, phone=w.user.phone, verification_status=w.verification_status.value,
-        city_id=w.city_id, rating_avg=w.rating_avg, created_at=w.created_at,
-    ) for w in workers]
+    if search:
+        term = f"%{search.strip()}%"
+        q = q.join(User, WorkerProfile.user_id == User.id).filter(
+            (WorkerProfile.full_name.ilike(term)) | (User.phone.ilike(term))
+        )
+    workers = q.order_by(WorkerProfile.created_at.desc()).limit(300).all()
+    return [_worker_list_item(w) for w in workers]
 
 
 # ── Complaints ────────────────────────────────────────────────────
@@ -253,6 +256,9 @@ def _worker_list_item(w: WorkerProfile) -> AdminWorkerListItemOut:
         languages=w.languages or [],
         skills=[AdminSkillRef(category=_NamedRef(name=s.category.name)) for s in w.skills],
         created_at=w.created_at,
+        phone=w.user.phone if w.user else None,
+        rating_avg=float(w.rating_avg) if w.rating_avg else 0.0,
+        is_available_now=bool(w.is_available_now),
     )
 
 
