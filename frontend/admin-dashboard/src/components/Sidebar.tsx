@@ -21,23 +21,24 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
+import { hasPermission, STAFF_ROLE_LABELS } from '@/lib/permissions';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 const OPERATIONS_NAV = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/workers', label: 'Worker Verification', icon: UserCheck },
-  { href: '/bookings', label: 'Bookings & Dispatch', icon: CalendarClock },
-  { href: '/customers', label: 'Customer Directory', icon: Users },
-  { href: '/complaints', label: 'Complaints & Disputes', icon: MessageSquareWarning },
-  { href: '/categories', label: 'Service Categories', icon: Tags },
-  { href: '/cities', label: 'Cities & Zones', icon: MapPin },
+  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, capability: null },
+  { href: '/workers', label: 'Worker Verification', icon: UserCheck, capability: 'verification' as const },
+  { href: '/bookings', label: 'Bookings & Dispatch', icon: CalendarClock, capability: null },
+  { href: '/customers', label: 'Customer Directory', icon: Users, capability: null },
+  { href: '/complaints', label: 'Complaints & Disputes', icon: MessageSquareWarning, capability: 'support' as const },
+  { href: '/categories', label: 'Service Categories', icon: Tags, capability: 'operations' as const },
+  { href: '/cities', label: 'Cities & Zones', icon: MapPin, capability: 'operations' as const },
 ];
 
 const GOVERNANCE_NAV = [
-  { href: '/payouts', label: 'Worker Payouts', icon: CreditCard },
-  { href: '/admins', label: 'Staff Management', icon: ShieldCheck, superOnly: true },
-  { href: '/audit-logs', label: 'Security & Audit Logs', icon: FileSpreadsheet, superOnly: true },
-  { href: '/settings', label: 'Platform Settings', icon: Settings, superOnly: true },
+  { href: '/payouts', label: 'Worker Payouts', icon: CreditCard, capability: 'finance' as const },
+  { href: '/admins', label: 'Staff Management', icon: ShieldCheck, capability: 'staff_management' as const },
+  { href: '/audit-logs', label: 'Security & Audit Logs', icon: FileSpreadsheet, capability: null },
+  { href: '/settings', label: 'Platform Settings', icon: Settings, capability: null, superOnly: true },
 ];
 
 export function Sidebar() {
@@ -66,21 +67,29 @@ export function Sidebar() {
             Field Operations
           </p>
           <div className="flex flex-col gap-0.5">
-            {OPERATIONS_NAV.map(({ href, label, icon: Icon }) => {
+            {OPERATIONS_NAV.map(({ href, label, icon: Icon, capability }) => {
               const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+              const locked = capability ? !hasPermission(admin?.staffRole, capability) : false;
               return (
                 <Link
                   key={href}
                   href={href}
                   className={clsx(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                    'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition-all',
                     isActive
                       ? 'bg-secondary text-secondary-foreground font-semibold shadow-sm'
                       : 'text-white/70 hover:bg-white/10 hover:text-white',
                   )}
                 >
-                  <Icon size={17} strokeWidth={2} className="shrink-0" />
-                  <span className="truncate">{label}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Icon size={17} strokeWidth={2} className="shrink-0" />
+                    <span className="truncate">{label}</span>
+                  </div>
+                  {locked && (
+                    <span className="text-[10px] bg-white/10 text-white/40 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                      <Lock size={10} />
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -100,8 +109,9 @@ export function Sidebar() {
             )}
           </div>
           <div className="flex flex-col gap-0.5">
-            {GOVERNANCE_NAV.map(({ href, label, icon: Icon, superOnly }) => {
+            {GOVERNANCE_NAV.map(({ href, label, icon: Icon, capability, superOnly }) => {
               const isActive = pathname === href || pathname?.startsWith(`${href}/`);
+              const locked = superOnly ? !isSuperAdmin : capability ? !hasPermission(admin?.staffRole, capability) : false;
               return (
                 <Link
                   key={href}
@@ -117,7 +127,7 @@ export function Sidebar() {
                     <Icon size={17} strokeWidth={2} className="shrink-0" />
                     <span className="truncate">{label}</span>
                   </div>
-                  {superOnly && !isSuperAdmin && (
+                  {locked && (
                     <span className="text-[10px] bg-white/10 text-white/40 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
                       <Lock size={10} />
                     </span>
@@ -146,7 +156,7 @@ export function Sidebar() {
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30">
-                  <ShieldCheck size={10} /> Operations Admin
+                  <ShieldCheck size={10} /> {admin?.staffRole ? STAFF_ROLE_LABELS[admin.staffRole] : 'Operations Admin'}
                 </span>
               )}
             </div>

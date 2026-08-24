@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,10 +8,59 @@ from app.config import settings
 from app.auth.schemas import (
     RequestOtpIn, RequestOtpOut, VerifyOtpIn, TokenPairOut, RefreshTokenIn,
     AdminLoginIn, AdminTokenOut,
+    RegisterCustomerIn, RegisterWorkerIn, LoginIn,
+    ForgotPasswordIn, ForgotPasswordOut, ResetPasswordIn, ResetPasswordOut,
 )
 from app.auth import service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post("/register/customer", response_model=TokenPairOut, status_code=status.HTTP_201_CREATED)
+def register_customer(payload: RegisterCustomerIn, db: Session = Depends(get_db)):
+    user, access, refresh = service.register_customer(
+        db, payload.full_name, payload.email, payload.phone, payload.password
+    )
+    return TokenPairOut(
+        access_token=access, refresh_token=refresh,
+        role=user.role.value, user_id=user.id, is_new_user=True,
+    )
+
+
+@router.post("/register/worker", response_model=TokenPairOut, status_code=status.HTTP_201_CREATED)
+def register_worker(payload: RegisterWorkerIn, db: Session = Depends(get_db)):
+    user, access, refresh = service.register_worker(
+        db, payload.full_name, payload.email, payload.phone, payload.password,
+        payload.city_id, payload.years_experience, payload.languages,
+    )
+    return TokenPairOut(
+        access_token=access, refresh_token=refresh,
+        role=user.role.value, user_id=user.id, is_new_user=True,
+    )
+
+
+@router.post("/login", response_model=TokenPairOut)
+def login(payload: LoginIn, db: Session = Depends(get_db)):
+    user, access, refresh = service.login_with_password(db, payload.email, payload.password, payload.role)
+    return TokenPairOut(
+        access_token=access, refresh_token=refresh,
+        role=user.role.value, user_id=user.id, is_new_user=False,
+    )
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordOut)
+def forgot_password(payload: ForgotPasswordIn, request: Request, db: Session = Depends(get_db)):
+    dev_token = service.request_password_reset(db, payload.email, requested_ip=request.client.host if request.client else None)
+    return ForgotPasswordOut(
+        message="If an account exists for this email, a password reset link has been sent.",
+        dev_reset_token=dev_token,
+    )
+
+
+@router.post("/reset-password", response_model=ResetPasswordOut)
+def reset_password(payload: ResetPasswordIn, db: Session = Depends(get_db)):
+    service.reset_password(db, payload.token, payload.new_password)
+    return ResetPasswordOut(message="Password reset successful. You can now log in with your new password.")
 
 
 @router.post("/otp/request", response_model=RequestOtpOut)
@@ -37,19 +86,16 @@ def verify_otp(payload: VerifyOtpIn, db: Session = Depends(get_db)):
 
 @router.post("/refresh", response_model=TokenPairOut)
 def refresh_token(payload: RefreshTokenIn, db: Session = Depends(get_db)):
-    new_access, new_refresh = service.rotate_refresh_token(db, payload.refresh_token)
-    # sub is embedded in the access token; decode lightly for role/user_id in response
-    from app.security.security import decode_access_token
-    claims = decode_access_token(new_access)
+    user, new_access, new_refresh = service.rotate_refresh_token(db, payload.refresh_token)
     return TokenPairOut(
         access_token=new_access, refresh_token=new_refresh,
-        role=claims["role"], user_id=claims["sub"],
+        role=user.role.value, user_id=user.id,
     )
 
 
 @router.post("/admin/login", response_model=AdminTokenOut)
 def admin_login(payload: AdminLoginIn, db: Session = Depends(get_db)):
-    admin = db.query(AdminProfile).filter(AdminProfile.email == payload.email).first()
+    admin = db.query(AdminProfile).filter(AdminProfile.email == payload.email.strip().lower()).first()
     if not admin or not verify_password(payload.password, admin.password_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
 
@@ -57,10 +103,17 @@ def admin_login(payload: AdminLoginIn, db: Session = Depends(get_db)):
     if not user or not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin account deactivated")
 
+    from datetime import datetime
+    admin.last_login_at = datetime.utcnow()
+    db.commit()
+
     token = create_access_token(
         subject=user.id, role=user.role.value,
         secret=settings.ADMIN_JWT_SECRET_KEY,
     )
+    refresh = service.issue_refresh_token(db, user.id)
     return AdminTokenOut(
-        access_token=token, full_name=admin.full_name, email=admin.email, role=user.role.value
+        access_token=token, refresh_token=refresh,
+        full_name=admin.full_name, email=admin.email, role=user.role.value,
+        staff_role=admin.staff_role.value,
     )

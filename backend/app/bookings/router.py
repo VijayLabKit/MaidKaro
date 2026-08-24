@@ -14,12 +14,19 @@ from app.bookings import service
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
 
-def _booking_out(b: Booking) -> BookingOut:
+def _booking_out(b: Booking, viewer_role: Optional[Role] = None) -> BookingOut:
     return BookingOut(
         id=b.id, status=b.status.value, type=b.type.value, category_id=b.category_id,
         category_name=b.category.name if b.category else None,
         worker_id=b.worker_id, worker_name=b.worker.full_name if b.worker else None,
         worker_photo_url=b.worker.photo_url if b.worker else None,
+        # Only surface the customer's first name, and only to the worker
+        # assigned to the job (or staff) — never on the customer's own view
+        # of their own booking (irrelevant there) and never a full name/phone.
+        customer_first_name=(
+            (b.customer.full_name.split()[0] if b.customer and b.customer.full_name else None)
+            if viewer_role in (Role.WORKER, Role.ADMIN, Role.SUPER_ADMIN) else None
+        ),
         address_id=b.address_id,
         address_text=(f"{b.address.line1}, {b.address.line2}" if b.address and b.address.line2 else (b.address.line1 if b.address else None)),
         scheduled_for=b.scheduled_for,
@@ -37,7 +44,7 @@ def create_booking(
 ):
     customer = db.query(CustomerProfile).filter(CustomerProfile.user_id == user.id).first()
     booking = service.create_booking(db, customer, payload)
-    return _booking_out(booking)
+    return _booking_out(booking, user.role)
 
 
 @router.get("", response_model=List[BookingOut])
@@ -57,9 +64,12 @@ def list_my_bookings(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not applicable for this role")
 
     if status_filter:
-        q = q.filter(Booking.status == BookingStatus(status_filter))
+        # Support a comma-separated list of statuses (e.g. "CANCELLED,REJECTED")
+        # so the worker portal can group related terminal states into one tab.
+        statuses = [BookingStatus(s.strip()) for s in status_filter.split(",") if s.strip()]
+        q = q.filter(Booking.status.in_(statuses))
     bookings = q.order_by(Booking.created_at.desc()).limit(100).all()
-    return [_booking_out(b) for b in bookings]
+    return [_booking_out(b, user.role) for b in bookings]
 
 
 def _get_authorized_booking(db: Session, booking_id: str, user: User) -> Booking:
@@ -80,7 +90,7 @@ def _get_authorized_booking(db: Session, booking_id: str, user: User) -> Booking
 @router.get("/{booking_id}", response_model=BookingOut)
 def get_booking(booking_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     booking = _get_authorized_booking(db, booking_id, user)
-    return _booking_out(booking)
+    return _booking_out(booking, user.role)
 
 
 @router.post("/{booking_id}/status", response_model=BookingOut)
@@ -100,4 +110,4 @@ def update_booking_status(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed")
 
     updated = service.transition_booking(db, booking, payload.action, user.id, payload.reason)
-    return _booking_out(updated)
+    return _booking_out(updated, user.role)

@@ -73,11 +73,51 @@ export function clearStoredTokens() {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
-/** Authenticated fetch — attaches the Bearer token from localStorage. */
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+async function tryRefreshToken(tokens: StoredTokens): Promise<string | null> {
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: tokens.refreshToken }),
+      });
+      if (!res.ok) {
+        clearStoredTokens();
+        return null;
+      }
+      const data = await res.json();
+      const updated: StoredTokens = {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        role: data.role || tokens.role,
+        userId: data.user_id || tokens.userId,
+      };
+      setStoredTokens(updated);
+      return updated.accessToken;
+    } catch {
+      clearStoredTokens();
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+/** Authenticated fetch — attaches Bearer token from localStorage, with silent refresh on 401. */
 export async function apiFetchAuthed<T>(path: string, options: RequestInit = {}): Promise<T> {
   const tokens = getStoredTokens();
   if (!tokens) throw new ApiError(401, "Not logged in");
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+
+  let res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     cache: "no-store",
     headers: {
@@ -86,9 +126,24 @@ export async function apiFetchAuthed<T>(path: string, options: RequestInit = {})
       ...(options.headers || {}),
     },
   });
-  if (res.status === 401) {
-    clearStoredTokens();
+
+  if (res.status === 401 && tokens.refreshToken) {
+    const newAccessToken = await tryRefreshToken(tokens);
+    if (newAccessToken) {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${newAccessToken}`,
+          ...(options.headers || {}),
+        },
+      });
+    } else {
+      clearStoredTokens();
+    }
   }
+
   return handle<T>(res);
 }
 
@@ -209,7 +264,32 @@ export const getWorker = (id: string) => apiFetch<ApiWorkerPublic>(`/workers/${i
 
 export const getWorkerReviews = (workerId: string) => apiFetch<ApiReview[]>(`/reviews/worker/${workerId}`);
 
-// ── Auth ──────────────────────────────────────────────────────────────
+// ── Auth: email + password (primary) ─────────────────────────────────
+
+export const registerCustomer = (payload: {
+  full_name: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirm_password: string;
+}) => apiFetch<TokenPair>("/auth/register/customer", { method: "POST", body: JSON.stringify(payload) });
+
+export const loginWithPassword = (email: string, password: string, role: "CUSTOMER" | "WORKER") =>
+  apiFetch<TokenPair>("/auth/login", { method: "POST", body: JSON.stringify({ email, password, role }) });
+
+export const forgotPassword = (email: string) =>
+  apiFetch<{ message: string; dev_reset_token: string | null }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+export const resetPassword = (token: string, new_password: string, confirm_password: string) =>
+  apiFetch<{ message: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, new_password, confirm_password }),
+  });
+
+// ── Auth: legacy OTP (kept available as an alternate login method) ───
 
 export const requestOtp = (phone: string, purpose: "LOGIN" | "SIGNUP" = "LOGIN") =>
   apiFetch<{ message: string; expires_in_seconds: number; dev_otp: string | null }>("/auth/otp/request", {
@@ -276,3 +356,69 @@ export const updateBookingStatus = (id: string, action: "CANCEL", reason?: strin
 
 export const createReview = (payload: { booking_id: string; rating: number; comment?: string }) =>
   apiFetchAuthed<ApiReview>("/reviews", { method: "POST", body: JSON.stringify(payload) });
+
+// ── Authenticated: complaints & disputes ─────────────────────────────
+
+export interface ApiComplaint {
+  id: string;
+  booking_id: string;
+  type: "COMPLAINT" | "DISPUTE";
+  status: "OPEN" | "IN_REVIEW" | "AWAITING_INFO" | "RESOLVED" | "CLOSED" | "DISMISSED";
+  description: string;
+  resolution_note: string | null;
+  refund_issued: number | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface ApiComplaintMessage {
+  id: string;
+  sender_user_id: string;
+  sender_role: "CUSTOMER" | "WORKER" | "STAFF";
+  body: string;
+  created_at: string;
+}
+
+export interface ApiComplaintDetail extends ApiComplaint {
+  messages: ApiComplaintMessage[];
+}
+
+export const raiseComplaint = (payload: { booking_id: string; type: "COMPLAINT" | "DISPUTE"; description: string }) =>
+  apiFetchAuthed<ApiComplaint>("/safety/complaints", { method: "POST", body: JSON.stringify(payload) });
+
+export const listMyComplaints = () => apiFetchAuthed<ApiComplaint[]>("/safety/complaints/me");
+
+export const getComplaintDetail = (id: string) => apiFetchAuthed<ApiComplaintDetail>(`/safety/complaints/${id}`);
+
+export const addComplaintMessage = (id: string, body: string) =>
+  apiFetchAuthed<ApiComplaintMessage>(`/safety/complaints/${id}/messages`, { method: "POST", body: JSON.stringify({ body }) });
+
+// ── Authenticated: notifications ─────────────────────────────────────
+
+export interface ApiNotification {
+  id: string;
+  title: string;
+  body: string;
+  channel: string;
+  data?: Record<string, any> | null;
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface ApiNotificationList {
+  items: ApiNotification[];
+  total: number;
+  unread_count: number;
+}
+
+export const listNotifications = (page = 1, size = 20) =>
+  apiFetchAuthed<ApiNotificationList>(`/notifications?page=${page}&size=${size}`);
+
+export const getUnreadNotificationCount = () =>
+  apiFetchAuthed<{ unread_count: number }>("/notifications/unread-count");
+
+export const markNotificationRead = (id: string) =>
+  apiFetchAuthed<ApiNotification>(`/notifications/${id}/read`, { method: "POST" });
+
+export const markAllNotificationsRead = () =>
+  apiFetchAuthed<{ unread_count: number }>("/notifications/read-all", { method: "POST" });

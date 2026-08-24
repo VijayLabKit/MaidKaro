@@ -8,11 +8,11 @@ from sqlalchemy import func
 from app.database import get_db
 from app.database.models import (
     User, Role, CustomerProfile, WorkerProfile, VerificationStatus, Booking,
-    BookingStatus, Payment, PaymentStatus, Complaint, ComplaintStatus,
-    SafetyIncident, SafetyIncidentStatus, ServiceCategory, City, AuditLog,
-    Payout, PayoutStatus, AdminProfile, PlatformSetting,
+    BookingStatus, Payment, PaymentStatus, Complaint, ComplaintStatus, ComplaintType,
+    ComplaintMessage, SafetyIncident, SafetyIncidentStatus, ServiceCategory, City, AuditLog,
+    Payout, PayoutStatus, PayoutLedgerEntry, AdminProfile, PlatformSetting, StaffRole,
 )
-from app.security.deps import get_current_admin
+from app.security.deps import get_current_admin, require_staff_permission
 from app.security.security import hash_password
 from app.config import settings
 from app.admin.schemas import (
@@ -21,10 +21,10 @@ from app.admin.schemas import (
     AdminCustomerOut, AdminCustomerListOut, AdminBookingOut, AdminBookingListOut,
     AnalyticsOverviewOut, _NamedRef, _CustomerRef, AdminWorkerListItemOut,
     AdminWorkerDetailOut, AdminKycDocumentOut, AdminSkillRef, WorkerReviewActionIn,
-    ComplaintResolveIn, AdminComplaintOut, AdminComplaintBookingRef,
-    UpdateCommissionIn, AdminCategoryOut,
+    ComplaintResolveIn, AdminComplaintOut, AdminComplaintBookingRef, ComplaintMessageOut,
+    AddComplaintMessageIn, UpdateCommissionIn, AdminCategoryOut,
     StaffMemberOut, CreateStaffIn, ToggleStaffStatusIn,
-    AdminPayoutOut, AdminAuditLogOut, PlatformSettingsOut, UpdatePlatformSettingsIn,
+    AdminPayoutOut, ProcessPayoutIn, AdminAuditLogOut, PlatformSettingsOut, UpdatePlatformSettingsIn,
 )
 from app.notifications.service import send_push
 from app.support.service import acknowledge_incident
@@ -57,7 +57,7 @@ def dashboard_stats(admin: User = Depends(get_current_admin), db: Session = Depe
 
 # ── Worker verification queue ────────────────────────────────────
 @router.get("/workers/pending-verification", response_model=List[AdminWorkerOut])
-def pending_verifications(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def pending_verifications(admin: User = Depends(require_staff_permission("verification")), db: Session = Depends(get_db)):
     workers = db.query(WorkerProfile).filter(WorkerProfile.verification_status == VerificationStatus.PENDING_REVIEW).all()
     return [AdminWorkerOut(
         id=w.id, full_name=w.full_name, phone=w.user.phone, verification_status=w.verification_status.value,
@@ -68,7 +68,7 @@ def pending_verifications(admin: User = Depends(get_current_admin), db: Session 
 @router.post("/workers/{worker_id}/verification")
 def act_on_worker_verification(
     worker_id: str, payload: WorkerVerificationActionIn,
-    admin: User = Depends(get_current_admin), db: Session = Depends(get_db),
+    admin: User = Depends(require_staff_permission("verification")), db: Session = Depends(get_db),
 ):
     worker = db.query(WorkerProfile).filter(WorkerProfile.id == worker_id).first()
     if not worker:
@@ -112,13 +112,14 @@ def list_workers(
 
 
 @router.post("/complaints/{complaint_id}/action")
-def act_on_complaint(complaint_id: str, payload: AdminComplaintActionIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def act_on_complaint(complaint_id: str, payload: AdminComplaintActionIn, admin: User = Depends(require_staff_permission("support")), db: Session = Depends(get_db)):
     complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
     if not complaint:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found")
 
     complaint.status = ComplaintStatus(payload.status)
     complaint.resolution_note = payload.resolution_note
+    complaint.assigned_staff_id = admin.id
     if payload.refund_amount:
         complaint.refund_issued = payload.refund_amount
         booking = complaint.booking
@@ -126,9 +127,14 @@ def act_on_complaint(complaint_id: str, payload: AdminComplaintActionIn, admin: 
             from app.payments.service import refund_payment
             from decimal import Decimal
             refund_payment(db, booking.payment, Decimal(str(payload.refund_amount)))
-    if complaint.status in (ComplaintStatus.RESOLVED, ComplaintStatus.DISMISSED):
+    if complaint.status in (ComplaintStatus.RESOLVED, ComplaintStatus.DISMISSED, ComplaintStatus.CLOSED):
         complaint.resolved_at = datetime.utcnow()
     db.commit()
+
+    from app.notifications.service import send_push
+    send_push(db, complaint.raised_by_user_id, "Complaint update",
+              f"Your complaint is now {complaint.status.value.replace('_', ' ').title()}.")
+
     _audit(db, admin, "COMPLAINT_ACTION", "Complaint", complaint.id, {"status": payload.status})
     return {"id": complaint.id, "status": complaint.status.value}
 
@@ -151,7 +157,7 @@ def acknowledge_safety_incident(incident_id: str, admin: User = Depends(get_curr
 
 # ── Catalog management ─────────────────────────────────────────────
 @router.post("/categories", status_code=status.HTTP_201_CREATED)
-def create_category(payload: CreateCategoryIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def create_category(payload: CreateCategoryIn, admin: User = Depends(require_staff_permission("operations")), db: Session = Depends(get_db)):
     category = ServiceCategory(**payload.model_dump())
     db.add(category)
     db.commit()
@@ -161,7 +167,7 @@ def create_category(payload: CreateCategoryIn, admin: User = Depends(get_current
 
 
 @router.post("/cities", status_code=status.HTTP_201_CREATED)
-def create_city(payload: CreateCityIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def create_city(payload: CreateCityIn, admin: User = Depends(require_staff_permission("operations")), db: Session = Depends(get_db)):
     city = City(**payload.model_dump())
     db.add(city)
     db.commit()
@@ -242,13 +248,13 @@ def _worker_list_item(w: WorkerProfile) -> AdminWorkerListItemOut:
 
 
 @router.get("/workers/pending", response_model=List[AdminWorkerListItemOut])
-def list_pending_workers(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def list_pending_workers(admin: User = Depends(require_staff_permission("verification")), db: Session = Depends(get_db)):
     workers = db.query(WorkerProfile).filter(WorkerProfile.verification_status == VerificationStatus.PENDING_REVIEW).all()
     return [_worker_list_item(w) for w in workers]
 
 
 @router.get("/workers/{worker_id}", response_model=AdminWorkerDetailOut)
-def get_worker_detail(worker_id: str, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def get_worker_detail(worker_id: str, admin: User = Depends(require_staff_permission("verification")), db: Session = Depends(get_db)):
     worker = db.query(WorkerProfile).filter(WorkerProfile.id == worker_id).first()
     if not worker:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Worker not found")
@@ -265,6 +271,11 @@ def get_worker_detail(worker_id: str, admin: User = Depends(get_current_admin), 
             for d in worker.documents
         ],
         verification_note=worker.verification_note,
+        guardian_name=worker.guardian_name, date_of_birth=worker.date_of_birth, gender=worker.gender,
+        address_line=worker.address_line, kyc_city=worker.kyc_city, kyc_state=worker.kyc_state,
+        kyc_pincode=worker.kyc_pincode, qualification=worker.qualification,
+        previous_experience=worker.previous_experience, kyc_submitted_at=worker.kyc_submitted_at,
+        phone=worker.user.phone if worker.user else None,
     )
 
 
@@ -282,29 +293,66 @@ def review_worker(
 
 # ── Complaints: alias matching the admin console's resolve screen ──
 @router.get("/complaints", response_model=List[AdminComplaintOut])
-def list_complaints_nested(status_filter: Optional[str] = Query(None, alias="status"), admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def list_complaints_nested(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    type_filter: Optional[str] = Query(None, alias="type"),
+    admin: User = Depends(require_staff_permission("support")), db: Session = Depends(get_db),
+):
     q = db.query(Complaint)
     if status_filter:
         q = q.filter(Complaint.status == ComplaintStatus(status_filter))
+    if type_filter:
+        q = q.filter(Complaint.type == ComplaintType(type_filter))
     complaints = q.order_by(Complaint.created_at.desc()).limit(200).all()
     return [
         AdminComplaintOut(
-            id=c.id, raised_by=c.raised_by.value, description=c.description, status=c.status.value,
+            id=c.id, type=c.type.value, raised_by=c.raised_by.value, description=c.description, status=c.status.value,
             resolution_note=c.resolution_note, refund_issued=float(c.refund_issued) if c.refund_issued else None,
-            created_at=c.created_at,
+            assigned_staff_id=c.assigned_staff_id, created_at=c.created_at,
             booking=AdminComplaintBookingRef(
                 id=c.booking.id, price_quoted=float(c.booking.price_quoted),
                 category=_NamedRef(name=c.booking.category.name),
                 customer=_CustomerRef(full_name=c.booking.customer.full_name),
                 worker=_CustomerRef(full_name=c.booking.worker.full_name) if c.booking.worker else None,
             ),
+            messages=[ComplaintMessageOut.model_validate(m) for m in c.messages],
         )
         for c in complaints
     ]
 
 
+@router.get("/complaints/{complaint_id}/messages", response_model=List[ComplaintMessageOut])
+def list_complaint_messages(complaint_id: str, admin: User = Depends(require_staff_permission("support")), db: Session = Depends(get_db)):
+    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    if not complaint:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found")
+    return complaint.messages
+
+
+@router.post("/complaints/{complaint_id}/messages", response_model=ComplaintMessageOut, status_code=status.HTTP_201_CREATED)
+def add_complaint_message_admin(
+    complaint_id: str, payload: AddComplaintMessageIn,
+    admin: User = Depends(require_staff_permission("support")), db: Session = Depends(get_db),
+):
+    complaint = db.query(Complaint).filter(Complaint.id == complaint_id).first()
+    if not complaint:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Complaint not found")
+    msg = ComplaintMessage(complaint_id=complaint.id, sender_user_id=admin.id, sender_role="STAFF", body=payload.body)
+    db.add(msg)
+    if complaint.status == ComplaintStatus.AWAITING_INFO:
+        complaint.status = ComplaintStatus.IN_REVIEW
+    complaint.assigned_staff_id = admin.id
+    db.commit()
+    db.refresh(msg)
+
+    from app.notifications.service import send_push
+    send_push(db, complaint.raised_by_user_id, "Response to your complaint",
+              "MaidKaro support has responded to your complaint. Tap to view.")
+    return msg
+
+
 @router.post("/complaints/{complaint_id}/resolve")
-def resolve_complaint(complaint_id: str, payload: ComplaintResolveIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def resolve_complaint(complaint_id: str, payload: ComplaintResolveIn, admin: User = Depends(require_staff_permission("support")), db: Session = Depends(get_db)):
     """Same action as /complaints/{id}/action, under the path name the
     admin console's resolve screen calls."""
     return act_on_complaint(
@@ -316,7 +364,7 @@ def resolve_complaint(complaint_id: str, payload: ComplaintResolveIn, admin: Use
 
 # ── Category commission (admin-only pricing lever) ──────────────
 @router.patch("/categories/{category_id}/commission")
-def update_category_commission(category_id: str, payload: UpdateCommissionIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def update_category_commission(category_id: str, payload: UpdateCommissionIn, admin: User = Depends(require_staff_permission("finance")), db: Session = Depends(get_db)):
     category = db.query(ServiceCategory).filter(ServiceCategory.id == category_id).first()
     if not category:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
@@ -328,7 +376,7 @@ def update_category_commission(category_id: str, payload: UpdateCommissionIn, ad
 
 # ── Super Admin: Staff Management ──────────────────────────────
 @router.get("/staff", response_model=List[StaffMemberOut])
-def list_staff(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def list_staff(admin: User = Depends(require_staff_permission("staff_management")), db: Session = Depends(get_db)):
     profiles = db.query(AdminProfile).all()
     results = []
     for p in profiles:
@@ -340,17 +388,16 @@ def list_staff(admin: User = Depends(get_current_admin), db: Session = Depends(g
             email=p.email,
             phone=u.phone,
             role=u.role.value,
+            staff_role=p.staff_role.value,
             is_active=u.is_active,
+            last_login_at=p.last_login_at,
             created_at=p.created_at,
         ))
     return results
 
 
 @router.post("/staff", response_model=StaffMemberOut, status_code=status.HTTP_201_CREATED)
-def create_staff_member(payload: CreateStaffIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
-    if admin.role != Role.SUPER_ADMIN:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Super Admins can create and invite staff accounts.")
-
+def create_staff_member(payload: CreateStaffIn, admin: User = Depends(require_staff_permission("staff_management")), db: Session = Depends(get_db)):
     existing_email = db.query(AdminProfile).filter(AdminProfile.email == payload.email).first()
     if existing_email:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "An admin with this email already exists.")
@@ -359,15 +406,16 @@ def create_staff_member(payload: CreateStaffIn, admin: User = Depends(get_curren
     if existing_user:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "An account with this phone number already exists.")
 
-    new_user = User(phone=payload.phone, role=Role(payload.role), is_active=True)
+    new_user = User(phone=payload.phone, email=payload.email.lower(), role=Role(payload.role), is_active=True)
     db.add(new_user)
     db.flush()
 
     new_profile = AdminProfile(
         user_id=new_user.id,
         full_name=payload.full_name,
-        email=payload.email,
+        email=payload.email.strip().lower(),
         password_hash=hash_password(payload.password),
+        staff_role=StaffRole(payload.staff_role),
     )
     db.add(new_profile)
     db.commit()
@@ -382,16 +430,15 @@ def create_staff_member(payload: CreateStaffIn, admin: User = Depends(get_curren
         email=new_profile.email,
         phone=new_user.phone,
         role=new_user.role.value,
+        staff_role=new_profile.staff_role.value,
         is_active=new_user.is_active,
+        last_login_at=new_profile.last_login_at,
         created_at=new_profile.created_at,
     )
 
 
 @router.patch("/staff/{staff_id}/status")
-def toggle_staff_status(staff_id: str, payload: ToggleStaffStatusIn, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
-    if admin.role != Role.SUPER_ADMIN:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only Super Admins can alter staff account status.")
-
+def toggle_staff_status(staff_id: str, payload: ToggleStaffStatusIn, admin: User = Depends(require_staff_permission("staff_management")), db: Session = Depends(get_db)):
     profile = db.query(AdminProfile).filter(AdminProfile.id == staff_id).first()
     if not profile:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Staff member not found.")
@@ -407,7 +454,7 @@ def toggle_staff_status(staff_id: str, payload: ToggleStaffStatusIn, admin: User
 
 # ── Financials: Worker Payouts & Settlement ──────────────────
 @router.get("/payouts", response_model=List[AdminPayoutOut])
-def list_payouts(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def list_payouts(admin: User = Depends(require_staff_permission("finance")), db: Session = Depends(get_db)):
     payouts = db.query(Payout).order_by(Payout.requested_at.desc()).limit(200).all()
     results = []
     for p in payouts:
@@ -427,20 +474,51 @@ def list_payouts(admin: User = Depends(get_current_admin), db: Session = Depends
 
 
 @router.post("/payouts/{payout_id}/process")
-def process_payout(payout_id: str, admin: User = Depends(get_current_admin), db: Session = Depends(get_db)):
+def process_payout(payout_id: str, payload: ProcessPayoutIn, admin: User = Depends(require_staff_permission("finance")), db: Session = Depends(get_db)):
+    """Pending (REQUESTED) -> Processing -> Paid (PROCESSED) / Failed.
+    Marking paid also flips every ledger entry linked to this payout to
+    is_paid_out=True — that's what the worker dashboard's pending/paid
+    balances actually read from, so this is the one place money "really"
+    moves in the demo system."""
     payout = db.query(Payout).filter(Payout.id == payout_id).first()
     if not payout:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Payout record not found.")
 
-    if payout.status == PayoutStatus.PROCESSED:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This payout has already been processed.")
+    from app.notifications.service import send_push
 
-    payout.status = PayoutStatus.PROCESSED
-    payout.processed_at = datetime.utcnow()
-    payout.razorpay_payout_id = f"payout_sim_{payout.id[:12]}"
-    db.commit()
+    if payload.action == "MARK_PROCESSING":
+        if payout.status != PayoutStatus.REQUESTED:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Cannot move payout from {payout.status.value} to PROCESSING")
+        payout.status = PayoutStatus.PROCESSING
+        db.commit()
+        _audit(db, admin, "PAYOUT_PROCESSING", "Payout", payout.id, {"amount": float(payout.amount)})
 
-    _audit(db, admin, "PAYOUT_PROCESSED", "Payout", payout.id, {"amount": float(payout.amount)})
+    elif payload.action == "MARK_PAID":
+        if payout.status not in (PayoutStatus.REQUESTED, PayoutStatus.PROCESSING):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Cannot mark a {payout.status.value} payout as paid")
+        payout.status = PayoutStatus.PROCESSED
+        payout.processed_at = datetime.utcnow()
+        payout.razorpay_payout_id = f"payout_sim_{payout.id[:12]}"
+        db.query(PayoutLedgerEntry).filter(PayoutLedgerEntry.payout_id == payout.id).update({"is_paid_out": True})
+        db.commit()
+        if payout.worker and payout.worker.user_id:
+            send_push(db, payout.worker.user_id, "Payout completed",
+                      f"\u20b9{float(payout.amount):.2f} has been paid out to you.")
+        _audit(db, admin, "PAYOUT_PROCESSED", "Payout", payout.id, {"amount": float(payout.amount)})
+
+    elif payload.action == "MARK_FAILED":
+        if payout.status == PayoutStatus.PROCESSED:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "This payout has already been paid and can't be marked failed.")
+        payout.status = PayoutStatus.FAILED
+        payout.failure_reason = payload.failure_reason
+        # Free the ledger entries so the worker can retry the payout request.
+        db.query(PayoutLedgerEntry).filter(PayoutLedgerEntry.payout_id == payout.id).update({"payout_id": None})
+        db.commit()
+        if payout.worker and payout.worker.user_id:
+            send_push(db, payout.worker.user_id, "Payout failed",
+                      f"Your payout of \u20b9{float(payout.amount):.2f} failed{f': {payload.failure_reason}' if payload.failure_reason else ''}. You can request it again.")
+        _audit(db, admin, "PAYOUT_FAILED", "Payout", payout.id, {"reason": payload.failure_reason})
+
     return {"id": payout.id, "status": payout.status.value, "processed_at": payout.processed_at}
 
 

@@ -72,3 +72,23 @@ def generate_refresh_token() -> str:
 
 def hash_refresh_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+# ── Password reset tokens (opaque, hashed at rest, single-use) ─────
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def validate_password_strength(password: str) -> Optional[str]:
+    """Returns an error message if the password is too weak, else None."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters long"
+    if not any(c.isdigit() for c in password):
+        return "Password must contain at least one number"
+    if not any(c.isalpha() for c in password):
+        return "Password must contain at least one letter"
+    return None

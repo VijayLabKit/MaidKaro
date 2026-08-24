@@ -34,7 +34,7 @@ class AdminWorkerOut(BaseModel):
 
 
 class AdminComplaintActionIn(BaseModel):
-    status: str = Field(..., pattern="^(IN_REVIEW|RESOLVED|DISMISSED)$")
+    status: str = Field(..., pattern="^(IN_REVIEW|AWAITING_INFO|RESOLVED|CLOSED|DISMISSED)$")
     resolution_note: Optional[str] = None
     refund_amount: Optional[float] = None
 
@@ -140,6 +140,17 @@ class AdminKycDocumentOut(BaseModel):
 class AdminWorkerDetailOut(AdminWorkerListItemOut):
     documents: List[AdminKycDocumentOut] = []
     verification_note: Optional[str] = None
+    guardian_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    address_line: Optional[str] = None
+    kyc_city: Optional[str] = None
+    kyc_state: Optional[str] = None
+    kyc_pincode: Optional[str] = None
+    qualification: Optional[str] = None
+    previous_experience: Optional[str] = None
+    kyc_submitted_at: Optional[datetime] = None
+    phone: Optional[str] = None
 
 
 class WorkerReviewActionIn(BaseModel):
@@ -148,7 +159,7 @@ class WorkerReviewActionIn(BaseModel):
 
 
 class ComplaintResolveIn(BaseModel):
-    status: str = Field(..., pattern="^(IN_REVIEW|RESOLVED|DISMISSED)$")
+    status: str = Field(..., pattern="^(IN_REVIEW|AWAITING_INFO|RESOLVED|CLOSED|DISMISSED)$")
     resolution_note: Optional[str] = None
     refund_amount: Optional[float] = None
 
@@ -161,15 +172,29 @@ class AdminComplaintBookingRef(BaseModel):
     worker: Optional[_CustomerRef] = None
 
 
+class ComplaintMessageOut(BaseModel):
+    id: str
+    sender_user_id: str
+    sender_role: str
+    body: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class AdminComplaintOut(BaseModel):
     id: str
+    type: str
     raised_by: str
     description: str
     status: str
     resolution_note: Optional[str] = None
     refund_issued: Optional[float] = None
+    assigned_staff_id: Optional[str] = None
     created_at: datetime
     booking: AdminComplaintBookingRef
+    messages: List[ComplaintMessageOut] = []
 
 
 class UpdateCommissionIn(BaseModel):
@@ -194,9 +219,11 @@ class StaffMemberOut(BaseModel):
     user_id: str
     full_name: str
     email: str
-    phone: str
+    phone: Optional[str] = None
     role: str
+    staff_role: str
     is_active: bool
+    last_login_at: Optional[datetime] = None
     created_at: datetime
 
 
@@ -206,6 +233,7 @@ class CreateStaffIn(BaseModel):
     phone: str
     password: str
     role: str = Field("ADMIN", pattern="^(ADMIN|SUPER_ADMIN)$")
+    staff_role: str = Field("OPERATIONS", pattern="^(SUPER_ADMIN|OPERATIONS|VERIFICATION|SUPPORT|FINANCE)$")
 
 
 class ToggleStaffStatusIn(BaseModel):
@@ -222,6 +250,15 @@ class AdminPayoutOut(BaseModel):
     requested_at: datetime
     processed_at: Optional[datetime] = None
     razorpay_payout_id: Optional[str] = None
+
+
+class ProcessPayoutIn(BaseModel):
+    action: str = Field(..., pattern="^(MARK_PROCESSING|MARK_PAID|MARK_FAILED)$")
+    failure_reason: Optional[str] = None
+
+
+class AddComplaintMessageIn(BaseModel):
+    body: str = Field(..., min_length=1, max_length=2000)
 
 
 class AdminAuditLogOut(BaseModel):

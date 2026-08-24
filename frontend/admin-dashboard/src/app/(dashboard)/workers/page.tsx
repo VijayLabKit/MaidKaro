@@ -3,7 +3,10 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
+import { hasPermission } from '@/lib/permissions';
 import { Card, PageHeader, StatusBadge, Button, EmptyState, LoadingState } from '@/components/ui';
+import { ShieldAlert } from 'lucide-react';
 
 interface PendingWorker {
   id: string;
@@ -20,13 +23,48 @@ interface PendingWorker {
 interface WorkerDetail extends PendingWorker {
   documents: { id: string; type: string; status: string; viewUrl: string; rejectReason: string | null }[];
   verificationNote: string | null;
+  guardianName: string | null;
+  dateOfBirth: string | null;
+  gender: string | null;
+  addressLine: string | null;
+  kycCity: string | null;
+  kycState: string | null;
+  kycPincode: string | null;
+  qualification: string | null;
+  previousExperience: string | null;
+  kycSubmittedAt: string | null;
+  phone: string | null;
 }
 
 const fetcher = <T,>(path: string) => api.get<T>(path);
 
 export default function WorkersPage() {
-  const { data: pending, isLoading, mutate } = useSWR<PendingWorker[]>('/admin/workers/pending', fetcher);
+  const { admin } = useAuth();
+  const canVerify = hasPermission(admin?.staffRole, 'verification');
+
+  const { data: pending, isLoading, mutate } = useSWR<PendingWorker[]>(canVerify ? '/admin/workers/pending' : null, fetcher);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  if (!canVerify) {
+    return (
+      <div className="py-12">
+        <PageHeader title="Worker verification" subtitle="Access is restricted to the Verification team." />
+        <Card>
+          <div className="flex items-center gap-4 py-6 text-center justify-center flex-col">
+            <div className="h-12 w-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
+              <ShieldAlert size={24} />
+            </div>
+            <div>
+              <p className="font-semibold text-base text-foreground">Verification Permission Required</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                Only accounts with <strong className="text-foreground">Verification</strong>, <strong className="text-foreground">Operations</strong>, or <strong className="text-foreground">Super Admin</strong> permissions can review worker KYC submissions.
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -110,6 +148,20 @@ function WorkerReviewModal({ workerId, onClose, onDecided }: { workerId: string;
                 </p>
               </div>
               <StatusBadge status={worker.verificationStatus} />
+            </div>
+
+            <h3 className="text-sm font-semibold text-navy-900 mb-2">Personal information</h3>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm bg-muted/40 rounded-lg p-3.5 border border-border/60">
+              <p><span className="text-muted-foreground">Phone:</span> <span className="text-foreground">{worker.phone ?? '—'}</span></p>
+              <p><span className="text-muted-foreground">Guardian:</span> <span className="text-foreground">{worker.guardianName ?? '—'}</span></p>
+              <p><span className="text-muted-foreground">Date of birth:</span> <span className="text-foreground">{worker.dateOfBirth ?? '—'}</span></p>
+              <p><span className="text-muted-foreground">Gender:</span> <span className="text-foreground">{worker.gender ?? '—'}</span></p>
+              <p className="col-span-2"><span className="text-muted-foreground">Address:</span> <span className="text-foreground">{worker.addressLine ?? '—'}{worker.kycCity ? `, ${worker.kycCity}` : ''}{worker.kycState ? `, ${worker.kycState}` : ''} {worker.kycPincode ?? ''}</span></p>
+              <p><span className="text-muted-foreground">Qualification:</span> <span className="text-foreground">{worker.qualification ?? '—'}</span></p>
+              <p><span className="text-muted-foreground">Submitted:</span> <span className="text-foreground">{worker.kycSubmittedAt ? new Date(worker.kycSubmittedAt).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '—'}</span></p>
+              {worker.previousExperience && (
+                <p className="col-span-2 pt-1"><span className="text-muted-foreground">Experience:</span> <span className="text-foreground">{worker.previousExperience}</span></p>
+              )}
             </div>
 
             <h3 className="text-sm font-semibold text-navy-900 mb-2 mt-6">Submitted documents</h3>

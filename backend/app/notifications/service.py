@@ -4,6 +4,9 @@ in-app records. SMS provider is pluggable — MSG91 in production,
 a dev logger locally so OTP flows work with zero external accounts.
 """
 import logging
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Optional
 
 import httpx
@@ -13,6 +16,33 @@ from app.config import settings
 from app.database.models import Notification, NotificationChannel, DeviceToken
 
 logger = logging.getLogger("maidkaro.notifications")
+
+
+def send_email(to_email: str, subject: str, body_text: str, body_html: Optional[str] = None) -> None:
+    """Pluggable email sender — SMTP in production, a dev logger locally so
+    registration/password-reset flows work with zero external accounts.
+    Configure via EMAIL_PROVIDER + SMTP_* environment variables."""
+    if settings.EMAIL_PROVIDER == "dev_logger" or not settings.SMTP_HOST:
+        logger.info("[DEV EMAIL] to=%s subject=%r body=%r", to_email, subject, body_text)
+        return
+
+    if settings.EMAIL_PROVIDER == "smtp":
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM_ADDRESS}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(body_text, "plain"))
+        if body_html:
+            msg.attach(MIMEText(body_html, "html"))
+        try:
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                if settings.SMTP_USE_TLS:
+                    server.starttls()
+                if settings.SMTP_USERNAME:
+                    server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+                server.sendmail(settings.EMAIL_FROM_ADDRESS, [to_email], msg.as_string())
+        except (smtplib.SMTPException, OSError):
+            logger.exception("SMTP email send failed for %s", to_email)
 
 
 def send_sms(phone: str, message: str) -> None:

@@ -8,6 +8,7 @@ import { PageHeader, Card, Button, StatusBadge, LoadingState, EmptyState } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShieldCheck, Crown, UserPlus, Phone, Mail, Lock, ShieldAlert, X } from 'lucide-react';
+import { STAFF_ROLE_LABELS, StaffRole, hasPermission } from '@/lib/permissions';
 
 interface StaffMember {
   id: string;
@@ -16,13 +17,15 @@ interface StaffMember {
   email: string;
   phone: string;
   role: 'ADMIN' | 'SUPER_ADMIN';
+  staffRole: StaffRole;
   isActive: boolean;
+  lastLoginAt: string | null;
   createdAt: string;
 }
 
 export default function StaffManagementPage() {
   const { admin } = useAuth();
-  const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
+  const canManageStaff = hasPermission(admin?.staffRole, 'staff_management');
 
   const { data: staff, isLoading, mutate } = useSWR<StaffMember[]>('/admin/staff', fetcher);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -31,10 +34,11 @@ export default function StaffManagementPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'ADMIN' | 'SUPER_ADMIN'>('ADMIN');
+  const [staffRole, setStaffRole] = useState<StaffRole>('OPERATIONS');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isSuperAdmin) {
+  if (!canManageStaff) {
     return (
       <div className="py-12">
         <PageHeader title="Staff & Admin Management" subtitle="Access is restricted to Super Admins." />
@@ -70,12 +74,14 @@ export default function StaffManagementPage() {
         phone: phone.startsWith('+91') ? phone : `+91${phone.replace(/\D/g, '')}`,
         password,
         role,
+        staff_role: staffRole,
       });
       setShowInviteModal(false);
       setFullName('');
       setEmail('');
       setPhone('');
       setPassword('');
+      setStaffRole('OPERATIONS');
       mutate();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create staff account.');
@@ -134,6 +140,9 @@ export default function StaffManagementPage() {
                       }`}
                     >
                       {s.isActive ? 'Active' : 'Deactivated'}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-primary/10 text-primary border border-primary/20">
+                      {STAFF_ROLE_LABELS[s.staffRole] ?? s.staffRole}
                     </span>
                   </div>
 
@@ -230,6 +239,22 @@ export default function StaffManagementPage() {
                   <option value="ADMIN">Operations Admin (Field verification, complaints, logistics)</option>
                   <option value="SUPER_ADMIN">Super Admin (Full financial, legal &amp; governance control)</option>
                 </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="s-staffrole">Permission Group</Label>
+                <select
+                  id="s-staffrole"
+                  value={staffRole}
+                  onChange={(e) => setStaffRole(e.target.value as StaffRole)}
+                  className="w-full h-10 px-3 rounded-lg border border-input bg-background text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {(Object.keys(STAFF_ROLE_LABELS) as StaffRole[]).map((r) => (
+                    <option key={r} value={r}>{STAFF_ROLE_LABELS[r]}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Controls what this account can access — worker verification, customer support/complaints, finance/payouts, or full super admin.
+                </p>
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}

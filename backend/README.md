@@ -149,8 +149,9 @@ docker compose exec api python scripts/seed_demo_data.py
 
 ## 6. Testing & Quality Assurance
 
-Run the test suite:
+Install dev dependencies and run the test suite:
 ```bash
+pip install -r requirements-dev.txt
 pytest tests/ -v
 ```
 

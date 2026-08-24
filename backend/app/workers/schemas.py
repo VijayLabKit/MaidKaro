@@ -109,3 +109,108 @@ class WorkerPublicOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── KYC: personal + professional information ─────────────────────────
+
+class WorkerKycProfileIn(BaseModel):
+    guardian_name: Optional[str] = None
+    date_of_birth: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    gender: Optional[str] = Field(None, pattern="^(Female|Male|Other)$")
+    address_line: str = Field(..., min_length=5, max_length=300)
+    kyc_city: str = Field(..., min_length=2, max_length=100)
+    kyc_state: str = Field(..., min_length=2, max_length=100)
+    kyc_pincode: str = Field(..., pattern=r"^\d{6}$")
+    qualification: Optional[str] = Field(None, max_length=150)
+    previous_experience: Optional[str] = Field(None, max_length=2000)
+
+
+class WorkerKycProfileOut(BaseModel):
+    guardian_name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    address_line: Optional[str] = None
+    kyc_city: Optional[str] = None
+    kyc_state: Optional[str] = None
+    kyc_pincode: Optional[str] = None
+    qualification: Optional[str] = None
+    previous_experience: Optional[str] = None
+    verification_status: str
+    verification_note: Optional[str] = None
+    kyc_submitted_at: Optional[datetime] = None
+    documents: List[KycDocumentOut] = []
+
+    class Config:
+        from_attributes = True
+
+
+# ── Worker dashboard: overview, earnings, calendar, payouts ─────────
+
+class WorkerDashboardOverviewOut(BaseModel):
+    full_name: str
+    verification_status: str
+    rating_avg: float
+    rating_count: int
+    completed_jobs: int
+    upcoming_bookings: int
+    cancelled_or_rejected: int
+    total_lifetime_earnings: float
+    pending_earnings: float          # earned, not yet paid out
+    available_balance: float          # alias of pending_earnings — what can be requested as a payout right now
+    paid_out_total: float
+
+
+class WorkerBookingListItemOut(BaseModel):
+    id: str
+    status: str
+    category_name: Optional[str] = None
+    customer_first_name: Optional[str] = None
+    scheduled_for: Optional[datetime] = None
+    duration_hours: float
+    price_quoted: float
+    service_address_text: Optional[str] = None
+    created_at: datetime
+
+
+class WorkerCalendarDayOut(BaseModel):
+    date: str  # "YYYY-MM-DD"
+    bookings: List[WorkerBookingListItemOut]
+
+
+class WorkerEarningsLedgerEntryOut(BaseModel):
+    id: str
+    booking_id: str
+    gross_amount: float
+    commission_amount: float
+    net_amount: float
+    is_paid_out: bool
+    payout_id: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class WorkerEarningsSummaryOut(BaseModel):
+    gross_lifetime: float
+    commission_lifetime: float
+    net_lifetime: float
+    pending_payout: float
+    paid_out: float
+    entries: List[WorkerEarningsLedgerEntryOut]
+
+
+class WorkerPayoutRequestOut(BaseModel):
+    id: str
+    amount: float
+    status: str
+    requested_at: datetime
+    processed_at: Optional[datetime] = None
+    razorpay_payout_id: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RequestPayoutIn(BaseModel):
+    note: Optional[str] = Field(None, max_length=300)

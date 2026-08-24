@@ -80,17 +80,37 @@ class PaymentStatus(str, enum.Enum):
 
 
 class PayoutStatus(str, enum.Enum):
-    REQUESTED = "REQUESTED"
+    REQUESTED = "REQUESTED"    # == "Pending" in worker-facing copy
     PROCESSING = "PROCESSING"
-    PROCESSED = "PROCESSED"
+    PROCESSED = "PROCESSED"    # == "Paid"
     FAILED = "FAILED"
+
+
+class StaffRole(str, enum.Enum):
+    """Granular permission role for ADMIN-tier accounts. Kept separate from
+    the coarse User.role (ADMIN/SUPER_ADMIN), which only gates whether a
+    token can reach the admin API surface at all — StaffRole then narrows
+    what that staff member may do within it. SUPER_ADMIN staff_role always
+    has every permission regardless of the `permissions` list."""
+    SUPER_ADMIN = "SUPER_ADMIN"
+    OPERATIONS = "OPERATIONS"
+    VERIFICATION = "VERIFICATION"
+    SUPPORT = "SUPPORT"
+    FINANCE = "FINANCE"
 
 
 class ComplaintStatus(str, enum.Enum):
     OPEN = "OPEN"
     IN_REVIEW = "IN_REVIEW"
+    AWAITING_INFO = "AWAITING_INFO"
     RESOLVED = "RESOLVED"
+    CLOSED = "CLOSED"
     DISMISSED = "DISMISSED"
+
+
+class ComplaintType(str, enum.Enum):
+    COMPLAINT = "COMPLAINT"
+    DISPUTE = "DISPUTE"
 
 
 class ComplaintRaisedBy(str, enum.Enum):
@@ -136,7 +156,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(String, primary_key=True, default=gen_uuid)
-    phone = Column(String, unique=True, nullable=False, index=True)  # E.164
+    phone = Column(String, unique=True, nullable=True, index=True)  # E.164; nullable — email/password users may skip phone at signup
+    email = Column(String, unique=True, nullable=True, index=True)  # login identity for password-based auth
+    password_hash = Column(String, nullable=True)  # bcrypt; null for phone-OTP-only accounts that never set a password
     role = Column(Enum(Role), nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -150,6 +172,26 @@ class User(Base):
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     device_tokens = relationship("DeviceToken", back_populates="user", cascade="all, delete-orphan")
     emergency_contacts = relationship("EmergencyContact", back_populates="user", cascade="all, delete-orphan")
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+
+class PasswordResetToken(Base):
+    """One-time, time-limited token emailed to the user for the forgot-password
+    flow. The raw token is only ever sent over email; the DB stores a hash of it
+    (mirrors RefreshToken's pattern) so a DB leak alone can't be used to reset
+    accounts."""
+    __tablename__ = "password_reset_tokens"
+    __table_args__ = (Index("ix_pwreset_user_used", "user_id", "used_at"),)
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    token_hash = Column(String, unique=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    requested_ip = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User", back_populates="password_reset_tokens")
 
 
 class OtpCode(Base):
@@ -260,6 +302,22 @@ class WorkerProfile(Base):
     last_lat = Column(Float, nullable=True)
     last_lng = Column(Float, nullable=True)
     last_location_at = Column(DateTime, nullable=True)
+
+    # ── KYC / verification: personal information (§4 of onboarding) ──
+    guardian_name = Column(String, nullable=True)        # Father/Mother/Husband/Guardian
+    date_of_birth = Column(String, nullable=True)         # ISO "YYYY-MM-DD"; string keeps timezone-naive DOB simple
+    gender = Column(String, nullable=True)                 # free-text per registration form ("Female","Male","Other")
+    address_line = Column(String, nullable=True)
+    kyc_city = Column(String, nullable=True)               # free-text city as printed on address proof (may differ from operating city_id)
+    kyc_state = Column(String, nullable=True)
+    kyc_pincode = Column(String, nullable=True)
+
+    # ── KYC: professional information ──
+    qualification = Column(String, nullable=True)
+    previous_experience = Column(Text, nullable=True)
+
+    kyc_submitted_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -532,16 +590,36 @@ class Complaint(Base):
 
     id = Column(String, primary_key=True, default=gen_uuid)
     booking_id = Column(String, ForeignKey("bookings.id"), nullable=False)
+    type = Column(Enum(ComplaintType), default=ComplaintType.COMPLAINT, nullable=False)
     raised_by = Column(Enum(ComplaintRaisedBy), nullable=False)
     raised_by_user_id = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     status = Column(Enum(ComplaintStatus), default=ComplaintStatus.OPEN, nullable=False)
     resolution_note = Column(Text, nullable=True)
     refund_issued = Column(Numeric(10, 2), nullable=True)
+    assigned_staff_id = Column(String, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     resolved_at = Column(DateTime, nullable=True)
 
     booking = relationship("Booking", back_populates="complaints")
+    messages = relationship("ComplaintMessage", back_populates="complaint", cascade="all, delete-orphan", order_by="ComplaintMessage.created_at")
+
+
+class ComplaintMessage(Base):
+    """Conversation thread on a complaint/dispute — lets the customer 'add
+    relevant information' and lets admin/support 'view responses', both
+    called for explicitly in the disputes requirement."""
+    __tablename__ = "complaint_messages"
+    __table_args__ = (Index("ix_complaintmsg_complaint_created", "complaint_id", "created_at"),)
+
+    id = Column(String, primary_key=True, default=gen_uuid)
+    complaint_id = Column(String, ForeignKey("complaints.id", ondelete="CASCADE"), nullable=False)
+    sender_user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    sender_role = Column(String, nullable=False)  # CUSTOMER | WORKER | STAFF
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    complaint = relationship("Complaint", back_populates="messages")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -694,9 +772,24 @@ class AdminProfile(Base):
     full_name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    staff_role = Column(Enum(StaffRole), default=StaffRole.OPERATIONS, nullable=False, index=True)
+    last_login_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="admin_profile")
+
+
+# Which StaffRole values may perform which coarse-grained admin capability.
+# SUPER_ADMIN always passes every check regardless of this table — enforced
+# in app.security.deps.require_staff_permission, not here, so this stays a
+# pure declaration of intent that's easy to audit.
+STAFF_PERMISSIONS: dict[str, tuple] = {
+    "verification": (StaffRole.SUPER_ADMIN, StaffRole.VERIFICATION, StaffRole.OPERATIONS),
+    "support": (StaffRole.SUPER_ADMIN, StaffRole.SUPPORT, StaffRole.OPERATIONS),
+    "finance": (StaffRole.SUPER_ADMIN, StaffRole.FINANCE),
+    "operations": (StaffRole.SUPER_ADMIN, StaffRole.OPERATIONS),
+    "staff_management": (StaffRole.SUPER_ADMIN,),
+}
 
 
 class PlatformSetting(Base):

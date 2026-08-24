@@ -45,9 +45,7 @@ def get_current_admin(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
-    """Admin tokens are signed with a *separate* secret from customer/worker
-    tokens, so a leaked customer token can never be replayed against the
-    admin console."""
+    """Admin tokens are signed with ADMIN_JWT_SECRET_KEY to prevent token replay."""
     if credentials is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
 
@@ -59,3 +57,20 @@ def get_current_admin(
     if not user or user.role not in (Role.ADMIN, Role.SUPER_ADMIN) or not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not an admin account")
     return user
+
+
+def require_staff_permission(capability: str):
+    """RBAC guard for admin console endpoints based on AdminProfile.staff_role."""
+    from app.database.models import AdminProfile, StaffRole, STAFF_PERMISSIONS
+
+    def _checker(admin: User = Depends(get_current_admin), db: Session = Depends(get_db)) -> User:
+        profile = db.query(AdminProfile).filter(AdminProfile.user_id == admin.id).first()
+        if not profile:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "No staff profile associated with this account")
+        if profile.staff_role == StaffRole.SUPER_ADMIN:
+            return admin
+        allowed = STAFF_PERMISSIONS.get(capability, ())
+        if profile.staff_role not in allowed:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Your role ({profile.staff_role.value}) doesn't have '{capability}' access")
+        return admin
+    return _checker

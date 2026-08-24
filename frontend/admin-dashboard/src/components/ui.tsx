@@ -45,29 +45,40 @@ const STATUS_VARIANT: Record<string, BadgeVariant> = {
   EXPIRED: 'secondary',
   OPEN: 'gold',
   IN_REVIEW: 'info',
+  AWAITING_INFO: 'warning',
   RESOLVED: 'success',
+  CLOSED: 'secondary',
   DISMISSED: 'secondary',
+  REQUESTED: 'gold',
+  PROCESSING: 'info',
+  PROCESSED: 'success',
+  FAILED: 'destructive',
 };
 
 export function StatusBadge({ status }: { status: string }) {
   return <Badge variant={STATUS_VARIANT[status] ?? 'secondary'}>{status.replaceAll('_', ' ')}</Badge>;
 }
 
-const VARIANT_MAP: Record<'primary' | 'secondary' | 'danger' | 'ghost', 'default' | 'gold' | 'destructive' | 'ghost'> = {
+const VARIANT_MAP: Record<'primary' | 'secondary' | 'danger' | 'ghost' | 'gold', 'default' | 'gold' | 'destructive' | 'ghost'> = {
   primary: 'default',
   secondary: 'gold',
   danger: 'destructive',
   ghost: 'ghost',
+  gold: 'gold',
 };
 
 export function Button({
   children,
   variant = 'primary',
+  size,
   className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'gold';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+}) {
   return (
-    <ShadButton variant={VARIANT_MAP[variant]} className={clsx(className)} {...props}>
+    <ShadButton variant={VARIANT_MAP[variant]} size={size} className={clsx(className)} {...props}>
       {children}
     </ShadButton>
   );

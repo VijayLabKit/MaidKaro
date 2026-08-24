@@ -1,7 +1,13 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 export function SiteFooter() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/worker")) return null;
+
   return (
     <footer className="border-t border-border bg-primary text-primary-foreground/80 mt-24">
       <div className="container py-12 grid gap-10 sm:grid-cols-2 md:grid-cols-4">

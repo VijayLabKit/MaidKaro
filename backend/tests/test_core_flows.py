@@ -40,7 +40,7 @@ class TestAuth:
 class TestBookingLifecycle:
     def test_full_booking_flow(self, client, seeded_catalog):
         cust_token, _ = _signup(client, "+919000000010", "CUSTOMER", "Booking Customer")
-        worker_token, _ = _signup(client, "+919000000011", "WORKER", "Booking Worker")
+        worker_token, worker_uid = _signup(client, "+919000000011", "WORKER", "Booking Worker")
         cust_h = {"Authorization": f"Bearer {cust_token}"}
         worker_h = {"Authorization": f"Bearer {worker_token}"}
 
@@ -51,22 +51,28 @@ class TestBookingLifecycle:
 
         # Admin approves worker
         from app.database import SessionLocal
-        from app.database.models import User, Role, AdminProfile, WorkerProfile
+        from app.database.models import User, Role, AdminProfile, WorkerProfile, StaffRole
         from app.security.security import hash_password
         db = SessionLocal()
-        admin_user = User(phone="+919999999901", role=Role.ADMIN)
+        admin_user = User(phone="+919999999901", role=Role.SUPER_ADMIN)
         db.add(admin_user); db.flush()
-        db.add(AdminProfile(user_id=admin_user.id, full_name="Admin", email="admin1@test.com", password_hash=hash_password("Pass1234!")))
+        db.add(AdminProfile(user_id=admin_user.id, full_name="Admin", email="admin1@test.com", password_hash=hash_password("Pass1234!"), staff_role=StaffRole.SUPER_ADMIN))
         db.commit()
-        worker_profile = db.query(WorkerProfile).filter(WorkerProfile.user_id.isnot(None)).order_by(WorkerProfile.created_at.desc()).first()
+        worker_profile = db.query(WorkerProfile).filter(WorkerProfile.user_id == worker_uid).first()
+        worker_id = worker_profile.id
+        worker_profile.city_id = seeded_catalog["city_id"]
+        worker_profile.rating_avg = 5.0
+        worker_profile.years_experience = 10
+        db.commit()
         db.close()
 
         r = client.post("/api/v1/auth/admin/login", json={"email": "admin1@test.com", "password": "Pass1234!"})
         admin_h = {"Authorization": f"Bearer {r.json()['access_token']}"}
-        r = client.post(f"/api/v1/admin/workers/{worker_profile.id}/verification", json={"action": "APPROVE"}, headers=admin_h)
+        r = client.post(f"/api/v1/admin/workers/{worker_id}/verification", json={"action": "APPROVE"}, headers=admin_h)
         assert r.status_code == 200
 
-        client.post("/api/v1/workers/me/availability-now", json={"is_available_now": True}, headers=worker_h)
+        r = client.post("/api/v1/workers/me/availability-now", json={"is_available_now": True}, headers=worker_h)
+        assert r.status_code == 200, f"availability-now failed: {r.status_code} {r.text}"
 
         r = client.post("/api/v1/users/me/addresses", json={
             "label": "Home", "line1": "1 Test St", "pincode_code": "700001",

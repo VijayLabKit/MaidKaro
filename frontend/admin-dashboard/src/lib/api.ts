@@ -47,10 +47,55 @@ function transformKeys(value: unknown, transform: (k: string) => string): unknow
   return value;
 }
 
+let isAdminRefreshing = false;
+let adminRefreshPromise: Promise<string | null> | null = null;
+
+async function tryRefreshAdminToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const refreshToken = localStorage.getItem('maidkaro_admin_refresh_token');
+  if (!refreshToken) return null;
+
+  if (isAdminRefreshing && adminRefreshPromise) {
+    return adminRefreshPromise;
+  }
+
+  isAdminRefreshing = true;
+  adminRefreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) {
+        localStorage.removeItem('maidkaro_admin_access_token');
+        localStorage.removeItem('maidkaro_admin_refresh_token');
+        return null;
+      }
+      const data = await res.json();
+      if (data.access_token) {
+        localStorage.setItem('maidkaro_admin_access_token', data.access_token);
+        if (data.refresh_token) {
+          localStorage.setItem('maidkaro_admin_refresh_token', data.refresh_token);
+        }
+        return data.access_token as string;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      isAdminRefreshing = false;
+      adminRefreshPromise = null;
+    }
+  })();
+
+  return adminRefreshPromise;
+}
+
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAccessToken();
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  let res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     cache: 'no-store',
     headers: {
@@ -59,6 +104,21 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       ...options.headers,
     },
   });
+
+  if (res.status === 401 && path !== '/auth/admin/login' && path !== '/auth/refresh') {
+    const newToken = await tryRefreshAdminToken();
+    if (newToken) {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${newToken}`,
+          ...options.headers,
+        },
+      });
+    }
+  }
 
   const raw = await res.json().catch(() => ({}));
 

@@ -5,6 +5,10 @@ import { AppUser } from "./types";
 import {
   requestOtp as apiRequestOtp,
   verifyOtp as apiVerifyOtp,
+  registerCustomer as apiRegisterCustomer,
+  loginWithPassword as apiLoginWithPassword,
+  forgotPassword as apiForgotPassword,
+  resetPassword as apiResetPassword,
   getMyProfile,
   getStoredTokens,
   setStoredTokens,
@@ -16,6 +20,10 @@ interface AuthContextValue {
   isLoading: boolean;
   requestOtp: (phone: string) => Promise<{ devOtp: string | null }>;
   verifyOtp: (phone: string, otp: string, fullName?: string, email?: string) => Promise<void>;
+  registerCustomer: (fullName: string, email: string, phone: string, password: string, confirmPassword: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  forgotPassword: (email: string) => Promise<{ devToken: string | null }>;
+  resetPassword: (token: string, newPassword: string, confirmPassword: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -80,13 +88,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadUser();
   }
 
+  async function registerCustomer(fullName: string, email: string, phone: string, password: string, confirmPassword: string) {
+    const formatted = formatE164(phone);
+    const tokenPair = await apiRegisterCustomer({
+      full_name: fullName, email, phone: formatted, password, confirm_password: confirmPassword,
+    });
+    setStoredTokens({
+      accessToken: tokenPair.access_token,
+      refreshToken: tokenPair.refresh_token,
+      role: tokenPair.role,
+      userId: tokenPair.user_id,
+    });
+    await loadUser();
+  }
+
+  async function login(email: string, password: string) {
+    const tokenPair = await apiLoginWithPassword(email, password, "CUSTOMER");
+    setStoredTokens({
+      accessToken: tokenPair.access_token,
+      refreshToken: tokenPair.refresh_token,
+      role: tokenPair.role,
+      userId: tokenPair.user_id,
+    });
+    await loadUser();
+  }
+
+  async function forgotPassword(email: string) {
+    const result = await apiForgotPassword(email);
+    return { devToken: result.dev_reset_token };
+  }
+
+  async function resetPassword(token: string, newPassword: string, confirmPassword: string) {
+    await apiResetPassword(token, newPassword, confirmPassword);
+  }
+
   function logout() {
     clearStoredTokens();
     setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, requestOtp, verifyOtp, logout, refreshUser: loadUser }}>
+    <AuthContext.Provider value={{
+      user, isLoading, requestOtp, verifyOtp, registerCustomer, login, forgotPassword, resetPassword,
+      logout, refreshUser: loadUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );

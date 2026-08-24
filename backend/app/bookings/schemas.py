@@ -29,6 +29,7 @@ class BookingOut(BaseModel):
     worker_id: Optional[str] = None
     worker_name: Optional[str] = None
     worker_photo_url: Optional[str] = None
+    customer_first_name: Optional[str] = None  # worker-facing only; never full name/contact details
     address_id: str
     address_text: Optional[str] = None
     scheduled_for: Optional[datetime] = None

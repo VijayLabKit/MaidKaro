@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { getBooking, updateBookingStatus, createReview, ApiBooking, ApiError } from "@/lib/api";
+import { getBooking, updateBookingStatus, createReview, raiseComplaint, ApiBooking, ApiError } from "@/lib/api";
 import { toBooking } from "@/lib/mappers";
 import { useRequireAuth } from "@/lib/use-require-auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { CalendarClock, MapPin, Clock3, Receipt, ArrowLeft, Star, Loader2 } from "lucide-react";
+import { CalendarClock, MapPin, Clock3, Receipt, ArrowLeft, Star, Loader2, Flag, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function BookingDetailPage() {
@@ -30,6 +30,12 @@ export default function BookingDetailPage() {
   const [comment, setComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+  const [showComplaint, setShowComplaint] = useState(false);
+  const [complaintType, setComplaintType] = useState<"COMPLAINT" | "DISPUTE">("COMPLAINT");
+  const [complaintDescription, setComplaintDescription] = useState("");
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const [complaintSubmitted, setComplaintSubmitted] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -64,6 +70,22 @@ export default function BookingDetailPage() {
       setActionError(e instanceof ApiError ? e.message : "Couldn't submit your review.");
     } finally {
       setSubmittingReview(false);
+    }
+  }
+
+  async function handleSubmitComplaint() {
+    if (!apiBooking || complaintDescription.trim().length < 5) return;
+    setSubmittingComplaint(true);
+    setActionError(null);
+    try {
+      await raiseComplaint({ booking_id: apiBooking.id, type: complaintType, description: complaintDescription });
+      setShowComplaint(false);
+      setComplaintSubmitted(true);
+      setComplaintDescription("");
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : "Couldn't submit your report.");
+    } finally {
+      setSubmittingComplaint(false);
     }
   }
 
@@ -175,6 +197,26 @@ export default function BookingDetailPage() {
               <p className="text-sm text-muted-foreground text-center">Thanks for your review!</p>
             </>
           )}
+
+          {(booking.status === "COMPLETED" || booking.status === "CANCELLED" || booking.status === "IN_PROGRESS") && !complaintSubmitted && (
+            <>
+              <Separator className="my-5" />
+              <Button variant="outline" className="w-full gap-2" onClick={() => setShowComplaint(true)}>
+                <Flag className="h-4 w-4" /> Report an issue or raise a dispute
+              </Button>
+            </>
+          )}
+
+          {complaintSubmitted && (
+            <>
+              <Separator className="my-5" />
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                Your report has been submitted.{" "}
+                <Link href="/support" className="text-primary hover:underline">Track it here</Link>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -201,6 +243,42 @@ export default function BookingDetailPage() {
             <Button variant="gold" onClick={handleSubmitReview} disabled={submittingReview}>
               {submittingReview && <Loader2 className="h-4 w-4 animate-spin" />}
               Submit review
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showComplaint} onOpenChange={setShowComplaint}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Report an issue</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex gap-2">
+              <Button
+                type="button" variant={complaintType === "COMPLAINT" ? "gold" : "outline"} className="flex-1"
+                onClick={() => setComplaintType("COMPLAINT")}
+              >
+                General complaint
+              </Button>
+              <Button
+                type="button" variant={complaintType === "DISPUTE" ? "gold" : "outline"} className="flex-1"
+                onClick={() => setComplaintType("DISPUTE")}
+              >
+                Billing dispute
+              </Button>
+            </div>
+            <Textarea
+              placeholder="Tell us what happened — include as much detail as you can."
+              value={complaintDescription}
+              onChange={(e) => setComplaintDescription(e.target.value)}
+              rows={4}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="gold" onClick={handleSubmitComplaint} disabled={submittingComplaint || complaintDescription.trim().length < 5}>
+              {submittingComplaint && <Loader2 className="h-4 w-4 animate-spin" />}
+              Submit report
             </Button>
           </DialogFooter>
         </DialogContent>

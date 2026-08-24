@@ -82,3 +82,10 @@ Thumbs.db
 .coverage.*
 .pytest_cache/
 htmlcov/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep

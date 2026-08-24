@@ -9,6 +9,7 @@ interface AdminUser {
   fullName: string;
   email: string;
   role: 'ADMIN' | 'SUPER_ADMIN';
+  staffRole: 'SUPER_ADMIN' | 'OPERATIONS' | 'VERIFICATION' | 'SUPPORT' | 'FINANCE';
 }
 
 interface AuthContextValue {
@@ -28,10 +29,12 @@ const STORAGE_KEYS = {
 
 interface AdminLoginResponse {
   accessToken: string;
+  refreshToken: string;
   tokenType: string;
   fullName: string;
   email: string;
   role: 'ADMIN' | 'SUPER_ADMIN';
+  staffRole: 'SUPER_ADMIN' | 'OPERATIONS' | 'VERIFICATION' | 'SUPPORT' | 'FINANCE';
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -56,9 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       fullName: result.fullName,
       email: result.email,
       role: result.role || (email.includes('admin@') ? 'SUPER_ADMIN' : 'ADMIN'),
+      staffRole: result.staffRole,
     };
 
     localStorage.setItem(STORAGE_KEYS.access, result.accessToken);
+    if (result.refreshToken) {
+      localStorage.setItem(STORAGE_KEYS.refresh, result.refreshToken);
+    }
     localStorage.setItem(STORAGE_KEYS.admin, JSON.stringify(profile));
     setAdmin(profile);
     router.push('/dashboard');

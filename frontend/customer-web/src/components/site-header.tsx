@@ -4,11 +4,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, CalendarClock, User } from "lucide-react";
+import { Menu, X, CalendarClock, User, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
+
+import { NotificationBell } from "@/components/notification-bell";
 
 const NAV = [
   { href: "/services", label: "Services" },
@@ -20,6 +22,10 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { user } = useAuth();
+
+  // The Worker Portal is a separate, self-contained app section with its
+  // own header/nav/auth — it must never show the customer chrome.
+  if (pathname?.startsWith("/worker")) return null;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
@@ -54,6 +60,13 @@ export function SiteHeader() {
                   My bookings
                 </Link>
               </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/support">
+                  <ShieldAlert className="h-4 w-4" />
+                  Support
+                </Link>
+              </Button>
+              <NotificationBell className="mx-1" />
               <Link href="/profile" className="ml-1">
                 <Avatar className="h-9 w-9">
                   <AvatarFallback>{user.fullName.charAt(0)}</AvatarFallback>
@@ -95,6 +108,9 @@ export function SiteHeader() {
               <>
                 <Link href="/bookings" onClick={() => setOpen(false)} className="px-3 py-2.5 rounded-md text-sm font-medium hover:bg-accent flex items-center gap-2">
                   <CalendarClock className="h-4 w-4" /> My bookings
+                </Link>
+                <Link href="/support" onClick={() => setOpen(false)} className="px-3 py-2.5 rounded-md text-sm font-medium hover:bg-accent flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4" /> Complaints & disputes
                 </Link>
                 <Link href="/profile" onClick={() => setOpen(false)} className="px-3 py-2.5 rounded-md text-sm font-medium hover:bg-accent flex items-center gap-2">
                   <User className="h-4 w-4" /> Profile

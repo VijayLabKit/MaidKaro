@@ -40,6 +40,28 @@ class Settings(BaseSettings):
     OTP_EXPIRY_SECONDS: int = 300
     OTP_MAX_ATTEMPTS: int = 5
 
+    # Email (registration confirmations, password reset)
+    EMAIL_PROVIDER: str = "dev_logger"  # "dev_logger" | "smtp"
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    EMAIL_FROM_ADDRESS: str = "no-reply@maidkaro.in"
+    EMAIL_FROM_NAME: str = "MaidKaro"
+
+    # Password reset
+    PASSWORD_RESET_TOKEN_EXPIRE_MINUTES: int = 30
+    PASSWORD_RESET_MAX_ACTIVE_TOKENS: int = 3  # rate-limit guard: max unused tokens per user at once
+    CUSTOMER_WEB_BASE_URL: str = "http://localhost:3000"
+    WORKER_WEB_BASE_URL: str = "http://localhost:3000"
+    ADMIN_WEB_BASE_URL: str = "http://localhost:3001"
+
+    # File storage (KYC documents, profile photos) — local disk in dev,
+    # swap for S3/GCS in production (see app/uploads/router.py).
+    UPLOAD_DIR: str = "./uploads"
+    UPLOAD_URL_PREFIX: str = "/media"
+
     # Payments
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,16 +13,32 @@ import { Loader2 } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [mode, setMode] = useState<"password" | "otp-phone" | "otp-code">("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [otpEmail, setOtpEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [devOtp, setDevOtp] = useState<string | null>(null);
-  const { requestOtp, verifyOtp } = useAuth();
+  const { requestOtp, verifyOtp, login } = useAuth();
   const router = useRouter();
+
+  async function handlePasswordLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.push("/bookings");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Couldn't log you in. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +51,7 @@ export default function LoginPage() {
     try {
       const result = await requestOtp(phone);
       setDevOtp(result.devOtp);
-      setStep("otp");
+      setMode("otp-code");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't send the OTP. Please try again.");
     } finally {
@@ -51,7 +68,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      await verifyOtp(phone, otp, fullName || undefined, email || undefined);
+      await verifyOtp(phone, otp, fullName || undefined, otpEmail || undefined);
       router.push("/bookings");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "That code didn't work. Please try again.");
@@ -75,16 +92,70 @@ export default function LoginPage() {
             />
           </div>
           <CardTitle className="text-xl">
-            {step === "phone" ? "Log in or sign up" : "Enter OTP"}
+            {mode === "password" ? "Log in to MaidKaro" : mode === "otp-phone" ? "Log in with OTP" : "Enter OTP"}
           </CardTitle>
           <CardDescription>
-            {step === "phone"
+            {mode === "password"
+              ? "Use your email and password."
+              : mode === "otp-phone"
               ? "We'll text you a one-time code."
               : `Sent to +91 ${phone}.`}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {step === "phone" ? (
+          {mode === "password" && (
+            <form onSubmit={handlePasswordLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" variant="gold" className="w-full" disabled={loading}>
+                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Log in
+              </Button>
+
+              <p className="text-center text-sm text-muted-foreground">
+                New to MaidKaro?{" "}
+                <Link href="/register" className="text-primary font-medium hover:underline">
+                  Create an account
+                </Link>
+              </p>
+
+              <button
+                type="button"
+                onClick={() => { setError(null); setMode("otp-phone"); }}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground pt-1"
+              >
+                Log in with phone OTP instead
+              </button>
+            </form>
+          )}
+
+          {mode === "otp-phone" && (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="phone">Phone number</Label>
@@ -105,18 +176,17 @@ export default function LoginPage() {
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Send OTP
               </Button>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => setPhone("9876543210")}
-                  className="w-full text-xs text-muted-foreground hover:text-primary transition-colors py-1 bg-muted/60 rounded-md"
-                >
-                  ⚡ Fill Demo Phone: <strong>9876543210</strong>
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => { setError(null); setMode("password"); }}
+                className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
+              >
+                Back to email login
+              </button>
             </form>
-          ) : (
+          )}
+
+          {mode === "otp-code" && (
             <form onSubmit={handleVerify} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="otp">One-time code</Label>
@@ -146,8 +216,8 @@ export default function LoginPage() {
                 <Input id="name" placeholder="e.g. Ananya Sharma" value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email address (optional)</Label>
-                <Input id="email" type="email" placeholder="e.g. ananya@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+                <Label htmlFor="otpEmail">Email address (optional)</Label>
+                <Input id="otpEmail" type="email" placeholder="e.g. ananya@example.com" value={otpEmail} onChange={(e) => setOtpEmail(e.target.value)} />
               </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" variant="gold" className="w-full" disabled={loading}>
@@ -156,7 +226,7 @@ export default function LoginPage() {
               </Button>
               <button
                 type="button"
-                onClick={() => setStep("phone")}
+                onClick={() => setMode("otp-phone")}
                 className="w-full text-center text-sm text-muted-foreground hover:text-foreground"
               >
                 Change phone number

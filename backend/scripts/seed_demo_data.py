@@ -20,12 +20,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.database import SessionLocal, Base, engine
 from app.database.models import (
     City, ServiceZone, Pincode, ServiceCategory, CityCategory,
-    User, Role, AdminProfile, CustomerProfile, CustomerAddress,
+    User, Role, AdminProfile, StaffRole, CustomerProfile, CustomerAddress,
     WorkerProfile, WorkerSkill, KycDocument, AvailabilitySlot,
     VerificationStatus, DocumentType, WeekDay,
     Booking, BookingType, BookingStatus, BookingStatusEvent,
     Payment, PaymentStatus, Review, PayoutLedgerEntry, Payout, PayoutStatus,
-    Complaint, ComplaintStatus, ComplaintRaisedBy,
+    Complaint, ComplaintStatus, ComplaintType, ComplaintRaisedBy, ComplaintMessage,
     Notification, NotificationChannel, PlatformSetting, OtpCode, AuditLog,
     SafetyIncident, SafetyIncidentStatus,
 )
@@ -220,17 +220,21 @@ def already_seeded(db) -> bool:
     return db.query(PlatformSetting).filter(PlatformSetting.key == DEMO_SEED_MARKER_KEY).first() is not None
 
 
+DEMO_PASSWORD = "Demo@1234"
+
+
 def create_customers(db, city, pincodes):
     customers = []
     for i, name in enumerate(CUSTOMER_NAMES):
         ph = phone(CUSTOMER_PHONE_PREFIX, i)
-        user = User(phone=ph, role=Role.CUSTOMER)
+        first = name.split()[0].lower()
+        email = f"{first}.{i+1}@example.com"
+        user = User(phone=ph, email=email, password_hash=hash_password(DEMO_PASSWORD), role=Role.CUSTOMER)
         db.add(user)
         db.flush()
-        first = name.split()[0].lower()
         cust = CustomerProfile(
             user_id=user.id, full_name=name,
-            email=f"{first}.{i+1}@example.com",
+            email=email,
         )
         db.add(cust)
         db.flush()
@@ -264,16 +268,24 @@ def create_workers(db, city, zone, categories):
         + [VerificationStatus.NEEDS_RESUBMISSION] * 4
         + [VerificationStatus.REJECTED] * 3
     )
+    GUARDIAN_RELATIONS = ["Father", "Mother", "Husband", "Guardian"]
+    QUALIFICATIONS = ["Class 8 pass", "Class 10 pass", "Class 12 pass", "ITI Certificate", "Graduate (BA)"]
 
-    for i, (name, _gender) in enumerate(WORKER_NAMES):
+    for i, (name, gender) in enumerate(WORKER_NAMES):
         ph = phone(WORKER_PHONE_PREFIX, i)
-        user = User(phone=ph, role=Role.WORKER)
+        first = name.split()[0].lower()
+        email = f"{first}.{i+1}@workermail.com"
+        user = User(phone=ph, email=email, password_hash=hash_password(DEMO_PASSWORD), role=Role.WORKER)
         db.add(user)
         db.flush()
 
         status = statuses[i % len(statuses)]
         rating_count = random.randint(12, 120) if status == VerificationStatus.APPROVED else 0
         rating_avg = round(random.uniform(4.1, 5.0), 1) if rating_count else 0.0
+
+        has_kyc_profile = status != VerificationStatus.NOT_SUBMITTED
+        dob_year = random.randint(1975, 2003)
+        area = random.choice(SILIGURI_AREAS)
 
         worker = WorkerProfile(
             user_id=user.id, full_name=name,
@@ -289,6 +301,18 @@ def create_workers(db, city, zone, categories):
             rating_avg=rating_avg,
             rating_count=rating_count,
             is_available_now=random.choice([True, True, True, False]) if status == VerificationStatus.APPROVED else False,
+            # KYC personal + professional info — populated once the worker
+            # has moved past NOT_SUBMITTED in the verification lifecycle.
+            guardian_name=f"{random.choice(GUARDIAN_RELATIONS)}: {random.choice(['Ram', 'Shyam', 'Hari', 'Gopal', 'Anita', 'Sushila', 'Kamala'])} {name.split()[-1]}" if has_kyc_profile else None,
+            date_of_birth=f"{dob_year}-{random.randint(1,12):02d}-{random.randint(1,28):02d}" if has_kyc_profile else None,
+            gender=({"F": "Female", "M": "Male"}.get(gender, "Other")) if has_kyc_profile else None,
+            address_line=f"{random.randint(1, 450)}, {area}" if has_kyc_profile else None,
+            kyc_city="Siliguri" if has_kyc_profile else None,
+            kyc_state="West Bengal" if has_kyc_profile else None,
+            kyc_pincode=random.choice(["734001", "734004", "734005", "734006", "734010"]) if has_kyc_profile else None,
+            qualification=random.choice(QUALIFICATIONS) if has_kyc_profile else None,
+            previous_experience=f"Worked as domestic help for {random.randint(1,3)} families in {area} over the past {random.randint(2,6)} years." if has_kyc_profile else None,
+            kyc_submitted_at=(datetime.utcnow() - timedelta(days=random.randint(1, 60))) if has_kyc_profile else None,
         )
         db.add(worker)
         db.flush()
@@ -520,25 +544,46 @@ def create_complaints(db, bookings):
     if not completed_or_cancelled:
         return
     sample = random.sample(completed_or_cancelled, k=min(18, len(completed_or_cancelled)))
-    statuses = [ComplaintStatus.OPEN, ComplaintStatus.IN_REVIEW, ComplaintStatus.RESOLVED, ComplaintStatus.DISMISSED]
+    statuses = [ComplaintStatus.OPEN, ComplaintStatus.IN_REVIEW, ComplaintStatus.AWAITING_INFO, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED, ComplaintStatus.DISMISSED]
+    created = []
     for i, booking in enumerate(sample):
         raised_by = ComplaintRaisedBy.CUSTOMER if random.random() < 0.75 else ComplaintRaisedBy.WORKER
         raiser_user_id = booking.customer.user_id if raised_by == ComplaintRaisedBy.CUSTOMER else (
             booking.worker.user_id if booking.worker else booking.customer.user_id
         )
         status = statuses[i % len(statuses)]
-        db.add(Complaint(
-            booking_id=booking.id, raised_by=raised_by, raised_by_user_id=raiser_user_id,
+        ctype = ComplaintType.DISPUTE if random.random() < 0.3 else ComplaintType.COMPLAINT
+        complaint = Complaint(
+            booking_id=booking.id, type=ctype, raised_by=raised_by, raised_by_user_id=raiser_user_id,
             description=COMPLAINT_TEXTS[i % len(COMPLAINT_TEXTS)],
             status=status,
             resolution_note="Refund processed and service guidelines reiterated to the worker." if status == ComplaintStatus.RESOLVED else (
                 "Verified via audit trail and dismissed as policy-compliant." if status == ComplaintStatus.DISMISSED else None
             ),
             refund_issued=Decimal(str(round(float(booking.price_quoted) * 0.5, 2))) if status == ComplaintStatus.RESOLVED else None,
-            resolved_at=datetime.utcnow() - timedelta(days=random.randint(1, 15)) if status in (ComplaintStatus.RESOLVED, ComplaintStatus.DISMISSED) else None,
-        ))
+            resolved_at=datetime.utcnow() - timedelta(days=random.randint(1, 15)) if status in (ComplaintStatus.RESOLVED, ComplaintStatus.DISMISSED, ComplaintStatus.CLOSED) else None,
+        )
+        db.add(complaint)
+        db.flush()
+        created.append(complaint)
+
+        # A short realistic conversation thread for complaints that have progressed past OPEN
+        if status != ComplaintStatus.OPEN:
+            db.add(ComplaintMessage(
+                complaint_id=complaint.id, sender_user_id=raiser_user_id, sender_role=raised_by.value,
+                body="Adding more detail as requested — the issue occurred during the scheduled visit.",
+                created_at=complaint.created_at + timedelta(hours=3),
+            ))
+        if status in (ComplaintStatus.AWAITING_INFO, ComplaintStatus.RESOLVED, ComplaintStatus.CLOSED):
+            db.add(ComplaintMessage(
+                complaint_id=complaint.id, sender_user_id=raiser_user_id, sender_role="STAFF",
+                body="Thanks for the details — we're looking into this with the assigned worker." if status == ComplaintStatus.AWAITING_INFO
+                    else "This has been reviewed and resolved. Thank you for your patience.",
+                created_at=complaint.created_at + timedelta(hours=6),
+            ))
     db.flush()
-    print(f"Created {len(sample)} demo complaints across OPEN, IN_REVIEW, RESOLVED, and DISMISSED.")
+    print(f"Created {len(sample)} demo complaints/disputes with conversation threads across OPEN, IN_REVIEW, AWAITING_INFO, RESOLVED, CLOSED, and DISMISSED.")
+    return created
 
 
 def create_notifications(db, customers, workers, bookings):
@@ -577,29 +622,33 @@ def create_notifications(db, customers, workers, bookings):
 
 def create_staff_accounts(db):
     staff_data = [
-        ("Ishan Chowdhury", "admin@maidkaro.com", "+910000000000", Role.SUPER_ADMIN, "ChangeMe123!"),
-        ("Priyanka Sen (Ops Lead)", "ops.admin@maidkaro.com", "+919900000001", Role.ADMIN, "ChangeMe123!"),
-        ("Rahul Banerjee (Trust & Safety)", "safety.desk@maidkaro.com", "+919900000002", Role.ADMIN, "ChangeMe123!"),
-        ("Ankita Roy (City Coordinator)", "siliguri.ops@maidkaro.com", "+919900000003", Role.ADMIN, "ChangeMe123!"),
+        ("Ishan Chowdhury", "admin@maidkaro.com", "+910000000000", Role.SUPER_ADMIN, StaffRole.SUPER_ADMIN, "ChangeMe123!"),
+        ("Priyanka Sen (Ops Lead)", "ops.admin@maidkaro.com", "+919900000001", Role.ADMIN, StaffRole.OPERATIONS, "ChangeMe123!"),
+        ("Rahul Banerjee (Trust & Safety)", "safety.desk@maidkaro.com", "+919900000002", Role.ADMIN, StaffRole.SUPPORT, "ChangeMe123!"),
+        ("Ankita Roy (Verification)", "verification.desk@maidkaro.com", "+919900000003", Role.ADMIN, StaffRole.VERIFICATION, "ChangeMe123!"),
+        ("Debashish Ghosh (Finance)", "finance.desk@maidkaro.com", "+919900000004", Role.ADMIN, StaffRole.FINANCE, "ChangeMe123!"),
     ]
 
-    for full_name, email, ph, role, pwd in staff_data:
+    for full_name, email, ph, role, staff_role, pwd in staff_data:
         existing = db.query(AdminProfile).filter(AdminProfile.email == email).first()
         if existing:
             existing.full_name = full_name
+            existing.staff_role = staff_role
             db.commit()
             continue
         user = db.query(User).filter(User.phone == ph).first()
         if not user:
-            user = User(phone=ph, role=role, is_active=True)
+            user = User(phone=ph, email=email, role=role, is_active=True)
             db.add(user)
             db.flush()
+        elif not user.email:
+            user.email = email
         db.add(AdminProfile(
             user_id=user.id, full_name=full_name, email=email,
-            password_hash=hash_password(pwd),
+            password_hash=hash_password(pwd), staff_role=staff_role,
         ))
     db.flush()
-    print("Created 4 demo administrative and ops staff accounts.")
+    print("Created 5 demo staff accounts (Super Admin, Operations, Support, Verification, Finance).")
 
 
 def create_audit_logs(db, admin_user_id, workers, categories, complaints):
@@ -688,11 +737,14 @@ def seed_demo(force: bool = False):
         print(f"  * {len(workers)} Workers across Approved, Pending, Resubmission, Rejected")
         print(f"  * {len(bookings)} Bookings (Completed, In-Progress, Confirmed, Pending, Cancelled)")
         print(f"  * {len(bookings)} Payment & Ledger records in INR")
-        print("  * Demo admin logins:")
-        print("    admin@maidkaro.com / ChangeMe123!  (Super Admin: Ishan Chowdhury)")
-        print("    ops.admin@maidkaro.com / ChangeMe123!  (Ops Lead: Priyanka Sen)")
-        print("    safety.desk@maidkaro.com / ChangeMe123!  (Trust & Safety)")
-        print("    siliguri.ops@maidkaro.com / ChangeMe123!  (City Coordinator)")
+        print(f"\n  All demo customers/workers share password: {DEMO_PASSWORD}")
+        print("  e.g. priya.1@example.com (customer), lakshmi.1@workermail.com (worker)")
+        print("  * Demo staff logins (all password: ChangeMe123!):")
+        print("    admin@maidkaro.com              (Super Admin: Ishan Chowdhury)")
+        print("    ops.admin@maidkaro.com          (Operations: Priyanka Sen)")
+        print("    safety.desk@maidkaro.com        (Support: Rahul Banerjee)")
+        print("    verification.desk@maidkaro.com  (Verification: Ankita Roy)")
+        print("    finance.desk@maidkaro.com       (Finance: Debashish Ghosh)")
     finally:
         db.close()
 
