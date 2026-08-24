@@ -85,6 +85,11 @@ class RegisterCustomerIn(BaseModel):
         return v
 
 
+class RegisterWorkerSkillIn(BaseModel):
+    category_id: str
+    hourly_rate: Optional[float] = None
+
+
 class RegisterWorkerIn(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=120)
     email: str
@@ -94,6 +99,8 @@ class RegisterWorkerIn(BaseModel):
     city_id: str
     years_experience: int = Field(0, ge=0, le=60)
     languages: list[str] = Field(default_factory=list)
+    category_ids: list[str] = Field(default_factory=list)
+    skills: list[RegisterWorkerSkillIn] = Field(default_factory=list)
 
     @field_validator("phone")
     @classmethod

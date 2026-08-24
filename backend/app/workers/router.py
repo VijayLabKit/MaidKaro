@@ -109,6 +109,12 @@ def update_live_location(
 
 
 # ── Skills ────────────────────────────────────────────────────────
+@router.get("/me/skills", response_model=List[SkillOut])
+def get_my_skills(user: User = Depends(require_roles(Role.WORKER)), db: Session = Depends(get_db)):
+    p = _get_worker_profile(db, user)
+    return p.skills
+
+
 @router.put("/me/skills", response_model=List[SkillOut])
 def set_my_skills(payload: List[SkillIn], user: User = Depends(require_roles(Role.WORKER)), db: Session = Depends(get_db)):
     p = _get_worker_profile(db, user)

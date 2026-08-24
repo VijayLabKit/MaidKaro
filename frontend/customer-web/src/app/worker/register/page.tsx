@@ -28,7 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useWorkerAuth } from "@/lib/worker-auth-context";
-import { getCitiesPublic, ApiCity, ApiError } from "@/lib/worker-api";
+import { getCitiesPublic, getCategoriesPublic, ApiCity, ApiCategorySimple, ApiError } from "@/lib/worker-api";
 
 const WORKER_PERKS = [
   {
@@ -60,6 +60,8 @@ export default function WorkerRegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [cityId, setCityId] = useState("");
   const [cities, setCities] = useState<ApiCity[]>([]);
+  const [categories, setCategories] = useState<ApiCategorySimple[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<{ [catId: string]: number }>({});
   const [yearsExperience, setYearsExperience] = useState("2");
   const [languages, setLanguages] = useState<string[]>(["Hindi"]);
   const [loading, setLoading] = useState(false);
@@ -70,12 +72,38 @@ export default function WorkerRegisterPage() {
 
   useEffect(() => {
     getCitiesPublic().then(setCities).catch(() => setCities([]));
+    getCategoriesPublic().then((cats) => {
+      setCategories(cats);
+      // Pre-select the first category (e.g. Home Cleaning) with its base rate
+      if (cats.length > 0) {
+        setSelectedSkills({ [cats[0].id]: cats[0].base_hourly_rate });
+      }
+    }).catch(() => setCategories([]));
   }, []);
 
   function toggleLanguage(lang: string) {
     setLanguages((prev) =>
       prev.includes(lang) ? prev.filter((l) => l !== lang) : [...prev, lang]
     );
+  }
+
+  function toggleSkill(catId: string, baseRate: number) {
+    setSelectedSkills((prev) => {
+      const next = { ...prev };
+      if (next[catId] !== undefined) {
+        delete next[catId];
+      } else {
+        next[catId] = baseRate;
+      }
+      return next;
+    });
+  }
+
+  function updateSkillRate(catId: string, rate: number) {
+    setSelectedSkills((prev) => ({
+      ...prev,
+      [catId]: rate,
+    }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -97,12 +125,21 @@ export default function WorkerRegisterPage() {
       setError("Please select your operational city.");
       return;
     }
+    if (Object.keys(selectedSkills).length === 0) {
+      setError("Please select at least one service you provide (e.g. Home Cleaning, Cooking).");
+      return;
+    }
     if (languages.length === 0) {
       setError("Please select at least one language you can communicate in.");
       return;
     }
     setLoading(true);
     try {
+      const skillsPayload = Object.entries(selectedSkills).map(([category_id, hourly_rate]) => ({
+        category_id,
+        hourly_rate: Number(hourly_rate) || 200,
+      }));
+
       await registerWorker({
         full_name: fullName,
         email,
@@ -112,6 +149,8 @@ export default function WorkerRegisterPage() {
         city_id: cityId,
         years_experience: Number(yearsExperience) || 0,
         languages,
+        category_ids: Object.keys(selectedSkills),
+        skills: skillsPayload,
       });
       router.push("/worker/dashboard");
     } catch (e) {
@@ -374,6 +413,81 @@ export default function WorkerRegisterPage() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Services & Hourly Rates Selection */}
+              <div className="space-y-3 pt-1">
+                <div>
+                  <Label className="text-xs font-semibold text-foreground/90 flex items-center justify-between">
+                    <span>Services You Offer &amp; Hourly Rates</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Select all that apply</span>
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Choose services you can provide and customize your hourly rates (₹/hr).
+                  </p>
+                </div>
+
+                {categories.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-dashed text-xs text-muted-foreground text-center">
+                    Loading service categories...
+                  </div>
+                ) : (
+                  <div className="grid sm:grid-cols-2 gap-2.5">
+                    {categories.map((cat) => {
+                      const isSelected = selectedSkills[cat.id] !== undefined;
+                      const currentRate = selectedSkills[cat.id] ?? cat.base_hourly_rate;
+
+                      return (
+                        <div
+                          key={cat.id}
+                          className={`p-3 rounded-xl border transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/5 shadow-xs ring-1 ring-primary/20"
+                              : "border-border/70 bg-card/40 hover:border-border"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleSkill(cat.id, cat.base_hourly_rate)}
+                              className="flex items-center gap-2.5 text-left flex-1 min-w-0"
+                            >
+                              <div
+                                className={`h-5 w-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${
+                                  isSelected
+                                    ? "bg-primary border-primary text-primary-foreground"
+                                    : "border-muted-foreground/40 bg-background"
+                                }`}
+                              >
+                                {isSelected && <Check className="h-3.5 w-3.5 stroke-[3]" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-foreground truncate">{cat.name}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">Base: ₹{cat.base_hourly_rate}/hr</p>
+                              </div>
+                            </button>
+
+                            {isSelected && (
+                              <div className="flex items-center gap-1 shrink-0 bg-background border border-border rounded-lg px-2 py-1 shadow-2xs">
+                                <span className="text-[11px] font-semibold text-muted-foreground">₹</span>
+                                <input
+                                  type="number"
+                                  min={50}
+                                  max={5000}
+                                  step={10}
+                                  value={currentRate}
+                                  onChange={(e) => updateSkillRate(cat.id, Number(e.target.value))}
+                                  className="w-14 text-xs font-bold text-foreground bg-transparent outline-none text-right"
+                                />
+                                <span className="text-[10px] text-muted-foreground">/hr</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Languages Spoken */}

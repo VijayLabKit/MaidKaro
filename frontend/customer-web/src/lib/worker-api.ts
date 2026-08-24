@@ -249,11 +249,22 @@ export interface ApiCity {
   state: string;
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────
+export interface SkillPayload {
+  category_id: string;
+  hourly_rate?: number;
+}
+
+export interface WorkerSkillItem {
+  id: string;
+  category_id: string;
+  hourly_rate: number | null;
+}
 
 export const registerWorker = (payload: {
   full_name: string; email: string; phone: string; password: string; confirm_password: string;
   city_id: string; years_experience: number; languages: string[];
+  category_ids?: string[];
+  skills?: SkillPayload[];
 }) => workerFetch<TokenPair>("/auth/register/worker", { method: "POST", body: JSON.stringify(payload) });
 
 export const loginWorker = (email: string, password: string) =>
@@ -269,11 +280,27 @@ export const resetPasswordWorker = (token: string, new_password: string, confirm
     method: "POST", body: JSON.stringify({ token, new_password, confirm_password }),
   });
 
-export const getCitiesPublic = () => workerFetch<ApiCity[]>("/catalog/cities");
+export interface ApiCategorySimple {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  base_hourly_rate: number;
+  icon_url: string | null;
+}
 
-// ── Worker: profile ───────────────────────────────────────────────────
+export const getCitiesPublic = () => workerFetch<ApiCity[]>("/catalog/cities");
+export const getCategoriesPublic = () => workerFetch<ApiCategorySimple[]>("/catalog/categories");
+
+// ── Worker: profile & skills ──────────────────────────────────────────
 
 export const getMyWorkerProfile = () => workerFetchAuthed<WorkerProfileMe>("/workers/me");
+export const getMySkills = () => workerFetchAuthed<WorkerSkillItem[]>("/workers/me/skills");
+export const setMySkills = (skills: SkillPayload[]) =>
+  workerFetchAuthed<WorkerSkillItem[]>("/workers/me/skills", {
+    method: "PUT",
+    body: JSON.stringify(skills),
+  });
 
 export const setAvailableNow = (isAvailable: boolean) =>
   workerFetchAuthed<{ is_available_now: boolean }>("/workers/me/availability-now", { method: "POST", body: JSON.stringify({ is_available_now: isAvailable }) });

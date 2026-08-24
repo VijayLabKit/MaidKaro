@@ -18,7 +18,7 @@ export function toServiceCategory(c: ApiServiceCategory): ServiceCategory {
  * than one service at different rates. */
 export function toWorkerSummary(w: ApiWorkerPublic): WorkerSummary {
   const cheapest = w.skills.reduce<ApiWorkerPublic["skills"][number] | null>((min, s) => {
-    if (!min || s.hourly_rate < min.hourly_rate) return s;
+    if (!min || (s.hourly_rate > 0 && s.hourly_rate < min.hourly_rate)) return s;
     return min;
   }, null);
   return {
@@ -32,7 +32,7 @@ export function toWorkerSummary(w: ApiWorkerPublic): WorkerSummary {
     ratingCount: w.rating_count,
     isAvailableNow: w.is_available_now,
     categorySlugs: w.skills.map((s) => s.category_slug),
-    hourlyRate: cheapest?.hourly_rate ?? 0,
+    hourlyRate: (cheapest?.hourly_rate && cheapest.hourly_rate > 0) ? cheapest.hourly_rate : 249,
     city: w.city || "Siliguri",
   };
 }
@@ -41,9 +41,9 @@ export function toWorkerSummary(w: ApiWorkerPublic): WorkerSummary {
 export function hourlyRateForCategory(w: ApiWorkerPublic, categorySlug?: string): number {
   if (categorySlug) {
     const match = w.skills.find((s) => s.category_slug === categorySlug);
-    if (match) return match.hourly_rate;
+    if (match && match.hourly_rate > 0) return match.hourly_rate;
   }
-  return w.skills[0]?.hourly_rate ?? 0;
+  return (w.skills[0]?.hourly_rate && w.skills[0].hourly_rate > 0) ? w.skills[0].hourly_rate : 249;
 }
 
 export function toReview(r: ApiReview): Review {

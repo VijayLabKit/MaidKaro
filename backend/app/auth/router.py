@@ -32,6 +32,7 @@ def register_worker(payload: RegisterWorkerIn, db: Session = Depends(get_db)):
     user, access, refresh = service.register_worker(
         db, payload.full_name, payload.email, payload.phone, payload.password,
         payload.city_id, payload.years_experience, payload.languages,
+        payload.category_ids, payload.skills,
     )
     return TokenPairOut(
         access_token=access, refresh_token=refresh,

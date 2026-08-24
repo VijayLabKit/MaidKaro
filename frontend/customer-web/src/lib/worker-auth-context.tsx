@@ -11,6 +11,7 @@ import {
   setWorkerTokens,
   clearWorkerTokens,
   WorkerProfileMe,
+  SkillPayload,
 } from "./worker-api";
 
 interface WorkerAuthContextValue {
@@ -19,6 +20,8 @@ interface WorkerAuthContextValue {
   registerWorker: (payload: {
     full_name: string; email: string; phone: string; password: string; confirm_password: string;
     city_id: string; years_experience: number; languages: string[];
+    category_ids?: string[];
+    skills?: SkillPayload[];
   }) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   forgotPassword: (email: string) => Promise<{ devToken: string | null }>;
@@ -58,6 +61,8 @@ export function WorkerAuthProvider({ children }: { children: ReactNode }) {
   async function registerWorker(payload: {
     full_name: string; email: string; phone: string; password: string; confirm_password: string;
     city_id: string; years_experience: number; languages: string[];
+    category_ids?: string[];
+    skills?: SkillPayload[];
   }) {
     const tokenPair = await apiRegisterWorker(payload);
     setWorkerTokens({

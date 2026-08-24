@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  LayoutDashboard, CalendarDays, Wallet, ShieldCheck, ListChecks, LogOut, Briefcase, Menu, ShieldAlert, Bell,
+  LayoutDashboard, CalendarDays, Wallet, ShieldCheck, ListChecks, LogOut, Briefcase, Menu, ShieldAlert, Bell, Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ import { WorkerNotificationBell } from "@/components/worker-notification-bell";
 
 const NAV = [
   { href: "/worker/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/worker/dashboard/services", label: "Services & Hourly Rates", icon: Sparkles },
   { href: "/worker/dashboard/bookings", label: "Bookings", icon: ListChecks },
   { href: "/worker/dashboard/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/worker/dashboard/earnings", label: "Earnings & Payouts", icon: Wallet },

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database.models import (
     User, Role, OtpCode, RefreshToken, CustomerProfile, WorkerProfile, City,
-    PasswordResetToken,
+    PasswordResetToken, WorkerSkill, ServiceCategory,
 )
 from app.security.security import (
     generate_otp, hash_otp, verify_otp_hash,
@@ -208,6 +208,8 @@ def register_customer(
 def register_worker(
     db: Session, full_name: str, email: str, phone: str, password: str,
     city_id: str, years_experience: int = 0, languages: Optional[list] = None,
+    category_ids: Optional[list] = None,
+    skills: Optional[list] = None,
 ) -> Tuple[User, str, str]:
     weakness = validate_password_strength(password)
     if weakness:
@@ -229,15 +231,37 @@ def register_worker(
     db.add(user)
     db.flush()
 
-    db.add(WorkerProfile(
+    worker_profile = WorkerProfile(
         user_id=user.id,
         full_name=full_name.strip(),
         city_id=city.id,
         years_experience=years_experience,
         languages=languages or [],
-        # verification_status defaults to NOT_SUBMITTED — worker must complete
-        # KYC before they can go live; enforced by the verification workflow.
-    ))
+    )
+    db.add(worker_profile)
+    db.flush()
+
+    skills_map: dict[str, Optional[float]] = {}
+    if skills:
+        for s in skills:
+            cat_id = s.category_id if hasattr(s, "category_id") else s.get("category_id")
+            rate = s.hourly_rate if hasattr(s, "hourly_rate") else s.get("hourly_rate")
+            if cat_id:
+                skills_map[cat_id] = rate
+    if category_ids:
+        for cat_id in category_ids:
+            if cat_id not in skills_map:
+                skills_map[cat_id] = None
+
+    for cat_id, rate in skills_map.items():
+        cat = db.query(ServiceCategory).filter(ServiceCategory.id == cat_id).first()
+        if cat:
+            db.add(WorkerSkill(
+                worker_id=worker_profile.id,
+                category_id=cat.id,
+                hourly_rate=rate if rate is not None else cat.base_hourly_rate
+            ))
+
     db.commit()
     db.refresh(user)
 
