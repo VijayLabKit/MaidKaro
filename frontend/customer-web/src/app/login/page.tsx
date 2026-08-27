@@ -169,18 +169,12 @@ export default function LoginPage() {
                 Log in with phone OTP instead
               </button>
 
-              <div className="border-t border-border pt-4 text-center mt-3">
-                <p className="text-xs text-muted-foreground">
-                  Are you a Maid, Cook, or Cleaner partner?
-                </p>
-                <Link
-                  href="/worker/login"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline mt-1"
-                >
-                  <Briefcase className="h-3.5 w-3.5" />
-                  Log in to Partner Portal &rarr;
+              <p className="text-center text-xs text-muted-foreground pt-1">
+                Are you a service partner?{" "}
+                <Link href="/worker/login" className="text-primary hover:underline">
+                  Worker login
                 </Link>
-              </div>
+              </p>
             </form>
           )}
 

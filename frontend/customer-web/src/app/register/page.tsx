@@ -352,9 +352,9 @@ export default function RegisterPage() {
                   </Link>
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Looking to work as a service partner?{" "}
-                  <Link href="/worker/register" className="text-primary font-medium hover:underline inline-flex items-center gap-1">
-                    Register as a worker &rarr;
+                  Are you a service partner?{" "}
+                  <Link href="/worker/register" className="text-primary hover:underline">
+                    Register as a worker
                   </Link>
                 </p>
               </div>
