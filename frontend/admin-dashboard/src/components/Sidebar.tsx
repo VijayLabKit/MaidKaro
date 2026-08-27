@@ -20,6 +20,7 @@ import {
   Crown,
   Lock,
   Briefcase,
+  X,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { hasPermission, STAFF_ROLE_LABELS } from '@/lib/permissions';
@@ -43,23 +44,55 @@ const GOVERNANCE_NAV = [
   { href: '/settings', label: 'Platform Settings', icon: Settings, capability: null, superOnly: true },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen = false,
+  onClose,
+}: {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
   const { admin, logout } = useAuth();
   const isSuperAdmin = admin?.role === 'SUPER_ADMIN';
 
   return (
-    <aside className="w-64 shrink-0 bg-primary min-h-screen flex flex-col border-r border-white/5 select-none">
-      {/* Brand Header */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-        <div className="relative h-9 w-9 shrink-0">
-          <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill sizes="36px" className="object-contain" />
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-navy-950/60 backdrop-blur-xs z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside
+        className={clsx(
+          'w-64 shrink-0 bg-primary min-h-screen flex flex-col border-r border-white/5 select-none z-50 transition-transform duration-200',
+          'fixed inset-y-0 left-0 lg:static lg:translate-x-0',
+          mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
+        )}
+      >
+        {/* Brand Header */}
+        <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="relative h-9 w-9 shrink-0">
+              <Image src="/icon-gold-transparent.png" alt="MaidKaro" fill sizes="36px" className="object-contain" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-white font-bold text-sm tracking-wider leading-none">MAIDKARO</p>
+              <p className="text-white/45 text-[11px] font-medium tracking-tight mt-1 truncate">Admin &amp; Ops Control</p>
+            </div>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10"
+              aria-label="Close menu"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
-        <div className="min-w-0">
-          <p className="text-white font-bold text-sm tracking-wider leading-none">MAIDKARO</p>
-          <p className="text-white/45 text-[11px] font-medium tracking-tight mt-1 truncate">Admin &amp; Ops Control</p>
-        </div>
-      </div>
 
       {/* Main Navigation */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-6 overflow-y-auto">
@@ -173,5 +206,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }

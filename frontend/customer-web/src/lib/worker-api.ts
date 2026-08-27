@@ -8,6 +8,8 @@
 import { API_BASE_URL, ApiError } from "./api";
 
 const WORKER_TOKEN_KEY = "maidkaro_worker_tokens";
+const WORKER_LAST_ACTIVE_KEY = "maidkaro_worker_last_active";
+const MAX_WORKER_IDLE_MS = 24 * 60 * 60 * 1000; // 24 hours idle expiration
 
 export interface WorkerStoredTokens {
   accessToken: string;
@@ -19,7 +21,18 @@ export interface WorkerStoredTokens {
 export function getWorkerTokens(): WorkerStoredTokens | null {
   if (typeof window === "undefined") return null;
   try {
+    const lastActive = window.localStorage.getItem(WORKER_LAST_ACTIVE_KEY);
+    if (lastActive) {
+      const elapsed = Date.now() - Number(lastActive);
+      if (elapsed > MAX_WORKER_IDLE_MS) {
+        clearWorkerTokens();
+        return null;
+      }
+    }
     const raw = window.localStorage.getItem(WORKER_TOKEN_KEY);
+    if (raw) {
+      window.localStorage.setItem(WORKER_LAST_ACTIVE_KEY, String(Date.now()));
+    }
     return raw ? (JSON.parse(raw) as WorkerStoredTokens) : null;
   } catch {
     return null;
@@ -28,10 +41,12 @@ export function getWorkerTokens(): WorkerStoredTokens | null {
 
 export function setWorkerTokens(tokens: WorkerStoredTokens) {
   window.localStorage.setItem(WORKER_TOKEN_KEY, JSON.stringify(tokens));
+  window.localStorage.setItem(WORKER_LAST_ACTIVE_KEY, String(Date.now()));
 }
 
 export function clearWorkerTokens() {
   window.localStorage.removeItem(WORKER_TOKEN_KEY);
+  window.localStorage.removeItem(WORKER_LAST_ACTIVE_KEY);
 }
 
 import { formatErrorDetail } from "./api";

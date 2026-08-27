@@ -18,9 +18,26 @@ export class ApiError extends Error {
   }
 }
 
+const ADMIN_LAST_ACTIVE_KEY = 'maidkaro_admin_last_active';
+const MAX_ADMIN_IDLE_MS = 8 * 60 * 60 * 1000; // 8 hours idle expiration
+
 function getAccessToken() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('maidkaro_admin_access_token');
+  const lastActive = localStorage.getItem(ADMIN_LAST_ACTIVE_KEY);
+  if (lastActive) {
+    const elapsed = Date.now() - Number(lastActive);
+    if (elapsed > MAX_ADMIN_IDLE_MS) {
+      localStorage.removeItem('maidkaro_admin_access_token');
+      localStorage.removeItem('maidkaro_admin_refresh_token');
+      localStorage.removeItem(ADMIN_LAST_ACTIVE_KEY);
+      return null;
+    }
+  }
+  const token = localStorage.getItem('maidkaro_admin_access_token');
+  if (token) {
+    localStorage.setItem(ADMIN_LAST_ACTIVE_KEY, String(Date.now()));
+  }
+  return token;
 }
 
 // Enum-style status dictionaries (e.g. bookingsByStatus: {PENDING: 3, ...})

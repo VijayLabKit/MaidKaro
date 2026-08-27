@@ -71,6 +71,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 }
 
 const TOKEN_KEY = "maidkaro_tokens";
+const LAST_ACTIVE_KEY = "maidkaro_last_active";
+const MAX_IDLE_MS = 24 * 60 * 60 * 1000; // 24 hours idle expiration
 
 export interface StoredTokens {
   accessToken: string;
@@ -82,7 +84,18 @@ export interface StoredTokens {
 export function getStoredTokens(): StoredTokens | null {
   if (typeof window === "undefined") return null;
   try {
+    const lastActive = window.localStorage.getItem(LAST_ACTIVE_KEY);
+    if (lastActive) {
+      const elapsed = Date.now() - Number(lastActive);
+      if (elapsed > MAX_IDLE_MS) {
+        clearStoredTokens();
+        return null;
+      }
+    }
     const raw = window.localStorage.getItem(TOKEN_KEY);
+    if (raw) {
+      window.localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+    }
     return raw ? (JSON.parse(raw) as StoredTokens) : null;
   } catch {
     return null;
@@ -91,10 +104,12 @@ export function getStoredTokens(): StoredTokens | null {
 
 export function setStoredTokens(tokens: StoredTokens) {
   window.localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
+  window.localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
 }
 
 export function clearStoredTokens() {
   window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(LAST_ACTIVE_KEY);
 }
 
 let isRefreshing = false;
