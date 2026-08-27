@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
-import { Loader2 } from "lucide-react";
+import { Loader2, Briefcase, User } from "lucide-react";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -78,10 +78,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="container flex items-center justify-center py-20 min-h-[70vh]">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <div className="relative h-24 w-36 mx-auto mb-2 flex items-center justify-center">
+    <div className="container flex items-center justify-center py-16 min-h-[70vh]">
+      <Card className="w-full max-w-sm shadow-lg border-border">
+        <CardHeader className="items-center text-center pb-3">
+          <div className="relative h-20 w-36 mx-auto mb-1 flex items-center justify-center">
             <Image
               src="/logo-light-transparent.png"
               alt="MaidKaro"
@@ -91,12 +91,28 @@ export default function LoginPage() {
               priority
             />
           </div>
+
+          {/* Role Toggle Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-muted rounded-xl w-full text-xs font-semibold my-2">
+            <div className="py-2 text-center rounded-lg bg-background text-foreground shadow-xs flex items-center justify-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-primary" />
+              Customer
+            </div>
+            <Link
+              href="/worker/login"
+              className="py-2 text-center rounded-lg text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Briefcase className="h-3.5 w-3.5" />
+              Partner / Worker
+            </Link>
+          </div>
+
           <CardTitle className="text-xl">
-            {mode === "password" ? "Log in to MaidKaro" : mode === "otp-phone" ? "Log in with OTP" : "Enter OTP"}
+            {mode === "password" ? "Customer Log In" : mode === "otp-phone" ? "Log in with OTP" : "Enter OTP"}
           </CardTitle>
           <CardDescription>
             {mode === "password"
-              ? "Use your email and password."
+              ? "Book & manage household services."
               : mode === "otp-phone"
               ? "We'll text you a one-time code."
               : `Sent to +91 ${phone}.`}
@@ -135,13 +151,13 @@ export default function LoginPage() {
               {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" variant="gold" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Log in
+                Log in as Customer
               </Button>
 
               <p className="text-center text-sm text-muted-foreground">
                 New to MaidKaro?{" "}
                 <Link href="/register" className="text-primary font-medium hover:underline">
-                  Create an account
+                  Create customer account
                 </Link>
               </p>
 
@@ -152,6 +168,19 @@ export default function LoginPage() {
               >
                 Log in with phone OTP instead
               </button>
+
+              <div className="border-t border-border pt-4 text-center mt-3">
+                <p className="text-xs text-muted-foreground">
+                  Are you a Maid, Cook, or Cleaner partner?
+                </p>
+                <Link
+                  href="/worker/login"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline mt-1"
+                >
+                  <Briefcase className="h-3.5 w-3.5" />
+                  Log in to Partner Portal &rarr;
+                </Link>
+              </div>
             </form>
           )}
 

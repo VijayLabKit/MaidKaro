@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useWorkerAuth } from "@/lib/worker-auth-context";
 import { ApiError } from "@/lib/worker-api";
-import { Loader2, Briefcase } from "lucide-react";
+import { Loader2, Briefcase, User } from "lucide-react";
+import Image from "next/image";
 
 export default function WorkerLoginPage() {
   const [email, setEmail] = useState("");
@@ -35,12 +36,35 @@ export default function WorkerLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-16">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center text-center">
-          <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-2">
-            <Briefcase className="h-7 w-7 text-primary" />
+      <Card className="w-full max-w-sm shadow-lg border-border">
+        <CardHeader className="items-center text-center pb-3">
+          <div className="relative h-20 w-36 mx-auto mb-1 flex items-center justify-center">
+            <Image
+              src="/logo-light-transparent.png"
+              alt="MaidKaro"
+              fill
+              sizes="144px"
+              className="object-contain"
+              priority
+            />
           </div>
-          <CardTitle className="text-xl">MaidKaro Worker Portal</CardTitle>
+
+          {/* Role Toggle Switcher */}
+          <div className="grid grid-cols-2 p-1 bg-muted rounded-xl w-full text-xs font-semibold my-2">
+            <Link
+              href="/login"
+              className="py-2 text-center rounded-lg text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+            >
+              <User className="h-3.5 w-3.5" />
+              Customer
+            </Link>
+            <div className="py-2 text-center rounded-lg bg-background text-foreground shadow-xs flex items-center justify-center gap-1.5 font-bold">
+              <Briefcase className="h-3.5 w-3.5 text-primary" />
+              Partner / Worker
+            </div>
+          </div>
+
+          <CardTitle className="text-xl">Worker Partner Log In</CardTitle>
           <CardDescription>Log in to manage your bookings, earnings, and schedule.</CardDescription>
         </CardHeader>
         <CardContent>

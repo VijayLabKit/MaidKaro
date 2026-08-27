@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Sparkles,
   Star,
+  Briefcase,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,13 +85,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background py-10 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-6xl grid lg:grid-cols-12 gap-8 items-center">
-        {/* Left Side: Brand Story & Value Proposition */}
-        <div className="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 rounded-3xl bg-gradient-to-br from-primary/95 via-primary to-primary/90 text-primary-foreground shadow-2xl relative overflow-hidden min-h-[640px]">
-          {/* Subtle background glow elements */}
-          <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-amber-400/15 blur-3xl pointer-events-none" />
-          <div className="absolute -left-16 -bottom-16 w-64 h-64 rounded-full bg-blue-400/15 blur-3xl pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-amber-500/[0.02] to-background py-10 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-5xl grid lg:grid-cols-12 gap-8 items-center">
+        {/* Left Side: Brand Promise Hero */}
+        <div className="hidden lg:flex lg:col-span-5 flex-col justify-between p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-primary/95 to-slate-900 text-white shadow-2xl relative overflow-hidden min-h-[600px]">
+          {/* Decorative glows */}
+          <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-amber-400/20 blur-3xl pointer-events-none" />
+          <div className="absolute -left-20 -bottom-20 w-64 h-64 rounded-full bg-blue-500/15 blur-3xl pointer-events-none" />
 
           {/* Header */}
           <div className="relative z-10 space-y-6">
@@ -101,37 +102,33 @@ export default function RegisterPage() {
                   alt="MaidKaro"
                   fill
                   sizes="160px"
-                  className="object-contain object-left"
+                  className="object-contain"
                   priority
                 />
               </div>
             </Link>
 
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur border border-white/15 text-xs font-medium text-amber-300">
-              <Sparkles className="h-3.5 w-3.5" /> India's Most Trusted Home Services
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold tracking-tight leading-tight">
-                Reliable, verified help for your home at your fingertips.
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                <Sparkles className="h-3.5 w-3.5" /> India's Premium Home Help
+              </span>
+              <h2 className="text-2xl font-bold mt-3 leading-snug">
+                Experience reliable help you can truly trust.
               </h2>
-              <p className="text-primary-foreground/80 text-sm leading-relaxed">
-                Join over 25,000+ households enjoying verified cleaning, cooking, babysitting, and elder care.
-              </p>
             </div>
 
             {/* Perks */}
-            <div className="space-y-4 pt-4">
-              {PERKS.map((perk, i) => {
-                const Icon = perk.icon;
+            <div className="space-y-4 pt-2">
+              {PERKS.map((p, i) => {
+                const Icon = p.icon;
                 return (
-                  <div key={i} className="flex items-start gap-3.5 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                    <div className="h-9 w-9 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                      <Icon className="h-5 w-5" />
+                  <div key={i} className="flex items-start gap-3.5">
+                    <div className="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center shrink-0 border border-white/10">
+                      <Icon className="h-4 w-4 text-amber-300" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-semibold text-white">{perk.title}</h4>
-                      <p className="text-xs text-primary-foreground/70 leading-relaxed mt-0.5">{perk.desc}</p>
+                      <p className="text-sm font-semibold text-white leading-tight">{p.title}</p>
+                      <p className="text-xs text-white/70 mt-0.5 leading-relaxed">{p.desc}</p>
                     </div>
                   </div>
                 );
@@ -140,7 +137,7 @@ export default function RegisterPage() {
           </div>
 
           {/* Social Proof Footer */}
-          <div className="relative z-10 pt-6 mt-6 border-t border-white/15 flex items-center justify-between">
+          <div className="relative z-10 pt-6 mt-6 border-t border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <div className="flex text-amber-300">
                 {[...Array(5)].map((_, i) => (
@@ -149,7 +146,7 @@ export default function RegisterPage() {
               </div>
               <span className="text-xs font-semibold text-white ml-1">4.9/5 Rating</span>
             </div>
-            <span className="text-xs text-primary-foreground/70">15,000+ Reviews</span>
+            <span className="text-xs text-white/70">15,000+ Reviews</span>
           </div>
         </div>
 
@@ -170,9 +167,24 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Role Toggle Switcher */}
+            <div className="grid grid-cols-2 p-1 bg-muted rounded-xl w-full text-xs font-semibold mb-6">
+              <div className="py-2.5 text-center rounded-lg bg-background text-foreground shadow-xs flex items-center justify-center gap-1.5 font-bold">
+                <User className="h-3.5 w-3.5 text-primary" />
+                Customer Account
+              </div>
+              <Link
+                href="/worker/register"
+                className="py-2.5 text-center rounded-lg text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Briefcase className="h-3.5 w-3.5" />
+                Partner / Worker
+              </Link>
+            </div>
+
             <div className="space-y-2 mb-6">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                Create your account
+                Create customer account
               </h1>
               <p className="text-sm text-muted-foreground">
                 Book verified home-service professionals in under 2 minutes.

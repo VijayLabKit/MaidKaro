@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { format } from 'date-fns';
-import { Search, UserCheck, Phone, MapPin, Star, Shield, Filter, Eye } from 'lucide-react';
+import { Search, Eye } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import { Card, PageHeader, LoadingState, EmptyState, StatusBadge, Button } from '@/components/ui';
 
@@ -53,12 +53,12 @@ const fetcher = (path: string) => api.get<WorkerListItem[]>(path);
 const detailFetcher = (path: string) => api.get<WorkerDetail>(path);
 
 const STATUS_FILTERS = [
-  { value: 'ALL', label: 'All Workers' },
-  { value: 'APPROVED', label: 'Verified & Active' },
+  { value: 'ALL', label: 'All' },
+  { value: 'APPROVED', label: 'Verified' },
   { value: 'PENDING_REVIEW', label: 'Pending Review' },
   { value: 'NEEDS_RESUBMISSION', label: 'Needs Resubmission' },
   { value: 'REJECTED', label: 'Rejected' },
-  { value: 'NOT_SUBMITTED', label: 'Draft / Unsubmitted' },
+  { value: 'NOT_SUBMITTED', label: 'Draft' },
 ];
 
 export default function WorkerDirectoryPage() {
@@ -77,24 +77,24 @@ export default function WorkerDirectoryPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageHeader
-        title="Worker Directory"
-        subtitle={workers ? `${workers.length} registered service professionals` : 'Browse, filter, and inspect registered helpers'}
+        title="Workers"
+        subtitle={workers ? `${workers.length} registered service professionals` : undefined}
       />
 
-      {/* Filter and Search Controls */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        {/* Status Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between mb-4">
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value}
               onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 statusFilter === f.value
-                  ? 'bg-secondary text-secondary-foreground shadow-xs'
-                  : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  ? 'bg-navy-900 text-white dark:bg-amber-400 dark:text-navy-950 font-semibold'
+                  : 'text-navy-700/60 hover:text-navy-900 hover:bg-navy-900/5'
               }`}
             >
               {f.label}
@@ -102,121 +102,99 @@ export default function WorkerDirectoryPage() {
           ))}
         </div>
 
-        {/* Search Bar */}
-        <div className="relative min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* Search Box */}
+        <div className="relative min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-navy-700/40" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or phone..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-navy-900/10 bg-card text-navy-900 placeholder:text-navy-700/40 outline-none focus:border-navy-900/30"
           />
         </div>
       </div>
 
-      {/* Directory Table */}
+      {/* Clean Directory Table */}
       {isLoading || !workers ? (
         <LoadingState />
       ) : workers.length === 0 ? (
         <EmptyState message="No workers found matching your filter criteria." />
       ) : (
         <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground bg-muted/30">
-                  <th className="px-5 py-3">Worker</th>
-                  <th className="px-5 py-3">Contact</th>
-                  <th className="px-5 py-3">City</th>
-                  <th className="px-5 py-3">Skills &amp; Services</th>
-                  <th className="px-5 py-3">Rating / Exp</th>
-                  <th className="px-5 py-3">Status</th>
-                  <th className="px-5 py-3">Availability</th>
-                  <th className="px-5 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {workers.map((w) => (
-                  <tr key={w.id} className="hover:bg-muted/40 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
-                          {w.fullName.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground text-sm truncate">{w.fullName}</p>
-                          <p className="text-[11px] text-muted-foreground">Joined {format(new Date(w.createdAt), 'dd MMM yyyy')}</p>
-                        </div>
-                      </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-navy-900/5 text-left text-xs text-navy-700/50">
+                <th className="px-5 py-3 font-medium">Name</th>
+                <th className="px-5 py-3 font-medium">Phone</th>
+                <th className="px-5 py-3 font-medium">City</th>
+                <th className="px-5 py-3 font-medium">Skills</th>
+                <th className="px-5 py-3 font-medium">Experience</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Joined</th>
+                <th className="px-5 py-3 font-medium text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workers.map((w) => {
+                const skillsList = w.skills.map((s) => s.category.name).join(', ');
+
+                return (
+                  <tr
+                    key={w.id}
+                    className="border-b border-navy-900/5 last:border-0 hover:bg-navy-900/[0.02] transition-colors"
+                  >
+                    {/* Name */}
+                    <td className="px-5 py-3.5 font-medium text-navy-900">
+                      {w.fullName}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-foreground font-mono">
-                      {w.phone ? (
-                        <span className="flex items-center gap-1">
-                          <Phone className="h-3 w-3 text-muted-foreground shrink-0" />
-                          {w.phone}
-                        </span>
-                      ) : (
-                        '—'
-                      )}
+
+                    {/* Phone */}
+                    <td className="px-5 py-3.5 text-navy-700/70 font-mono text-xs">
+                      {w.phone ?? '—'}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-foreground">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
-                        {w.city.name}
-                      </span>
+
+                    {/* City */}
+                    <td className="px-5 py-3.5 text-navy-700/70">
+                      {w.city.name}
                     </td>
-                    <td className="px-5 py-3.5">
-                      <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {w.skills.length > 0 ? (
-                          w.skills.map((s, i) => (
-                            <span key={i} className="px-1.5 py-0.5 rounded bg-muted text-[10px] font-medium text-foreground">
-                              {s.category.name}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </div>
+
+                    {/* Skills */}
+                    <td className="px-5 py-3.5 text-navy-700/70 text-xs max-w-[220px] truncate" title={skillsList}>
+                      {skillsList || '—'}
                     </td>
-                    <td className="px-5 py-3.5 text-xs">
-                      <div className="flex items-center gap-1.5">
-                        <span className="flex items-center gap-0.5 text-amber-500 font-semibold">
-                          <Star className="h-3 w-3 fill-amber-500" />
-                          {w.ratingAvg ? w.ratingAvg.toFixed(1) : 'New'}
-                        </span>
-                        <span className="text-muted-foreground font-normal">· {w.yearsExperience}y exp</span>
-                      </div>
+
+                    {/* Experience */}
+                    <td className="px-5 py-3.5 text-navy-700/70 text-xs">
+                      {w.yearsExperience}y exp
                     </td>
+
+                    {/* Status Badge */}
                     <td className="px-5 py-3.5">
                       <StatusBadge status={w.verificationStatus} />
                     </td>
-                    <td className="px-5 py-3.5 text-xs">
-                      {w.isAvailableNow ? (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Available
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-500/10 text-slate-500 border border-slate-500/20">
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> Offline
-                        </span>
-                      )}
+
+                    {/* Joined Date */}
+                    <td className="px-5 py-3.5 text-navy-700/50 text-xs whitespace-nowrap">
+                      {format(new Date(w.createdAt), 'dd MMM yyyy')}
                     </td>
+
+                    {/* Action Button */}
                     <td className="px-5 py-3.5 text-right">
                       <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => setSelectedId(w.id)}
-                        className="text-xs font-semibold inline-flex items-center gap-1"
+                        className="text-xs font-semibold inline-flex items-center gap-1 py-1 px-2.5 h-auto"
                       >
-                        <Eye className="h-3 w-3" /> View Profile
+                        <Eye className="h-3 w-3" /> View
                       </Button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+            </tbody>
+          </table>
         </Card>
       )}
 

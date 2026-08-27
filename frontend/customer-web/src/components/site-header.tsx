@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X, CalendarClock, User, ShieldAlert } from "lucide-react";
+import { Menu, X, CalendarClock, User, ShieldAlert, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
@@ -52,6 +52,15 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
+          <Button variant="ghost" size="sm" asChild className="text-xs font-semibold text-muted-foreground hover:text-foreground">
+            <Link href="/worker/login" className="flex items-center gap-1.5">
+              <Briefcase className="h-3.5 w-3.5 text-primary" />
+              Partner Login
+            </Link>
+          </Button>
+
+          <div className="h-4 w-px bg-border mx-1" />
+
           {user ? (
             <>
               <Button variant="ghost" size="sm" asChild>
@@ -103,6 +112,14 @@ export function SiteHeader() {
                 {item.label}
               </Link>
             ))}
+            <div className="h-px bg-border my-2" />
+            <Link
+              href="/worker/login"
+              onClick={() => setOpen(false)}
+              className="px-3 py-2.5 rounded-md text-sm font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 flex items-center gap-2"
+            >
+              <Briefcase className="h-4 w-4" /> Partner / Worker Login
+            </Link>
             <div className="h-px bg-border my-2" />
             {user ? (
               <>
